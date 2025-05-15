@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class LoginDto {
   @ApiProperty({
     description: '로그인 시 사용할 사용자 이름',
-    example: 'test',
+    example: 'testuser1',
     required: true,
   })
   @IsString({ message: '사용자 이름은 문자열이어야 합니다.' })
@@ -13,7 +13,7 @@ export class LoginDto {
 
   @ApiProperty({
     description: '로그인 시 사용할 비밀번호 (최소 8자 이상)',
-    example: 'test123!',
+    example: 'password123!',
     required: true,
     minLength: 8,
   })
