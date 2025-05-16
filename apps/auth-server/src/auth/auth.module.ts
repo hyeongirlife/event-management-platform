@@ -16,7 +16,16 @@ import { LocalStrategy } from './strategies/local.strategy';
       imports: [ConfigModule], // ConfigModule을 사용하여 환경 변수 접근
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'), // .env 파일에서 JWT 시크릿 키 가져오기
+        // Throw if JWT_SECRET is missing
+        secret: configService.getOrThrow
+          ? configService.getOrThrow<string>('JWT_SECRET') // NestJS v2+
+          : (() => {
+              const secret = configService.get<string>('JWT_SECRET');
+              if (!secret) {
+                throw new Error('🔴 JWT_SECRET이 존재하지 않습니다');
+              }
+              return secret;
+            })(),
         signOptions: {
           expiresIn: configService.get<string | number>('JWT_EXPIRES_IN'), // .env 파일에서 만료 시간 가져오기
         },
