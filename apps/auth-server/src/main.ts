@@ -33,5 +33,8 @@ async function bootstrap() {
   console.log(
     `✅ 인증 서버가 다음 주소에서 실행 중입니다: ${await app.getUrl()}`,
   );
+  console.log(
+    `✅ 인증 서버 Swagger UI는 다음 주소에서 확인 가능합니다: ${await app.getUrl()}/api-docs`,
+  );
 }
 bootstrap();

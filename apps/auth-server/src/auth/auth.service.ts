@@ -45,6 +45,7 @@ export class AuthService {
       sub: user._id, // JWT의 subject로 사용자 ID 사용
       roles: user.roles, // JWT payload에 역할 정보 포함
     };
+
     return {
       access_token: this.jwtService.sign(payload),
     };

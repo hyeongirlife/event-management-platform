@@ -1,0 +1,21 @@
+# This file can be used for .gitignore rules specific to the gateway-server.
+# Common rules, including for .env files, are now handled by the root .gitignore.
+
+# Example:
+# specific-gateway-file-to-ignore.tmp
+
+# Environment variables
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.development
+!.env.production
+
+# IDE specific files (if any specific to this sub-project)
+# .idea/
+# .vscode/
+
+# Build output (already covered by root .gitignore, but can be explicit)
+# /dist
+# /node_modules (already covered by root .gitignore) 
