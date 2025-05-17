@@ -1,6 +1,6 @@
 # Gateway Server (이벤트 보상 플랫폼)
 
-본 서버는 이벤트 보상 플랫폼 마이크로서비스 아키텍처의 API Gateway 역할을 수행합니다. 모든 외부 클라이언트 요청의 진입점(Entry Point)으로서, 인증(Authentication), 인가(Authorization), 요청 라우팅(Request Routing) 등 공통 관심사를 처리합니다.
+본 서버는 이벤트 보상 플랫폼 마이크로서비스 아키텍처의 API Gateway 역할을 수행합니다. 모든 외부 클라이언트 요청의 진입점(Entry Point)으로서, 인증(Authentication), 인가(Authorization), 요청 라우팅(Request Routing), API 문서화, 상태 확인 등 공통 관심사를 처리합니다.
 
 ## 1. 시스템 내 위치 및 구성
 
@@ -31,6 +31,7 @@ graph TD
 ### 2.1. API 진입점
 
 * 모든 외부 요청은 Gateway Server의 `/api/v1` 전역 접두사를 통해 시스템으로 진입합니다.
+* API 문서는 Swagger UI를 통해 `/api/v1/api-docs` 경로에서 확인할 수 있습니다.
 
 ### 2.2. 인증 및 인가 (Authentication & Authorization)
 
@@ -52,7 +53,8 @@ Gateway Server는 모든 요청에 대해 전역적으로 다음의 Guard를 순
 ### 2.3. 요청 라우팅 및 프록시 (Request Routing & Proxying)
 
 * **Public 경로 처리**:
-  * `/api/v1/auth/login`, `/api/v1/auth/register` (POST 요청) 및 `/api/v1/` (GET 요청, 상태 확인) 경로는 `AppController`에 명시적인 핸들러(`login`, `register`, `healthCheck`)로 정의되어 있으며, `@Public()` 데코레이터가 적용되어 인증 절차를 건너뜁니다. 이들 요청은 `AppController`의 `handleProxy` 메소드를 통해 직접 처리됩니다.
+  * `/api/v1/auth/login`, `/api/v1/auth/register` (POST 요청) 및 `/api/v1/` (루트 경로, GET 요청) 경로는 `AppController`에 명시적인 핸들러로 정의되어 있으며, `@Public()` 데코레이터가 적용되어 인증 절차를 건너뜁니다. 이들 요청은 `AppController`의 `handleProxy` 메소드 (또는 직접 응답)를 통해 처리됩니다.
+  * `/api/v1/health` (GET 요청) 경로는 `HealthController`를 통해 처리되며, `@Public()` 데코레이터가 적용되어 인증 없이 접근 가능합니다.
 * **기타 모든 요청**:
   * 위에서 언급된 Public 경로를 제외한 모든 요청은 `AppController`의 와일드카드 라우트 (`@All('*') proxyAllOtherRequests`)를 통해 처리됩니다.
   * 이 핸들러에는 `@Public()` 데코레이터가 없으므로, 전역으로 등록된 `JwtAuthGuard` 및 `RolesGuard`가 적용됩니다.
@@ -65,11 +67,12 @@ Gateway Server는 모든 요청에 대해 전역적으로 다음의 Guard를 순
   * `X-User-Username`: 인증된 사용자의 이름
   * `X-User-Roles`: 인증된 사용자의 역할 목록 (콤마로 구분된 문자열, 예: "USER,OPERATOR")
     이를 통해 하위 서비스는 자체적으로 토큰을 다시 검증할 필요 없이 요청 컨텍스트에서 사용자 정보를 신뢰하고 활용할 수 있습니다.
+* `AppService`의 `proxyRequest` 메소드에서는 하위 서비스로 실제 요청을 보내기 전에 대상 서비스, URL, 메소드 및 요청 본문(존재하는 경우)을 로깅하여 디버깅 편의성을 높였습니다. 또한, 프록시 시 불필요하거나 문제를 유발할 수 있는 `content-length` 헤더를 제거합니다.
 
 ### 2.4. 상태 확인 엔드포인트
 
-* Gateway Server의 루트 경로 (`/api/v1/` 또는 `/`)로 `GET` 요청 시, "Gateway is running" 메시지를 포함한 JSON 응답을 반환하여 서비스의 정상 동작 여부를 간단히 확인할 수 있습니다.
-  * 이 경로는 `AppController`의 `healthCheck` 메소드를 통해 처리되며, `@Public()` 데코레이터가 적용되어 인증 없이 접근 가능합니다.
+* **간단한 루트 경로 확인**: Gateway Server의 루트 경로 (`/api/v1/`)로 `GET` 요청 시, 간단한 환영 메시지와 함께 API 문서 및 상세 헬스 체크 엔드포인트 경로를 안내하는 JSON 응답을 반환합니다. 이 경로는 `AppController`의 `gatewayRoot` 메소드를 통해 처리되며, `@Public()` 데코레이터가 적용되어 인증 없이 접근 가능합니다.
+* **상세 헬스 체크**: `/api/v1/health` 경로로 `GET` 요청 시, `@nestjs/terminus`를 사용하여 Gateway Server 자체의 상태(메모리, 디스크 공간) 및 연결된 주요 하위 서비스(Auth Service, Event Service)의 HTTP 응답 가능 여부를 종합적으로 확인하여 상태 정보를 반환합니다. 이 엔드포인트는 `@Public()`으로 지정되어 인증 없이 접근 가능합니다.
 
 ## 3. 주요 요청 흐름 예시 (Mermaid)
 
@@ -135,14 +138,62 @@ sequenceDiagram
    # yarn start:prod
    ```
 
-   서버가 정상적으로 실행되면 콘솔에 `✅ 게이트웨이 서버가 다음 주소에서 실행 중입니다: http://localhost:[PORT]/api/v1` 와 같은 메시지가 출력됩니다.
+   서버가 정상적으로 실행되면 콘솔에 다음 메시지들이 출력됩니다:
+   * `✅ 게이트웨이 서버가 다음 주소에서 실행 중입니다: http://localhost:[PORT]/api/v1`
+   * `✅ 게이트웨이 서버 Swagger UI는 다음 주소에서 확인 가능합니다: http://localhost:[PORT]/api/v1/api-docs`
 
 ## 6. 향후 개선 및 고려 사항 (Gateway Server)
 
-* **Public 경로 명시적 처리**: (완료됨) `AppController`에 `/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/` (상태 확인) 경로에 대한 명시적 핸들러를 추가하고 `@Public()` 데코레이터를 적용하여 인증 예외 처리를 명확히 했습니다. 나머지 요청은 `@All('*')` 핸들러를 통해 전역 Guard의 보호를 받습니다.
-* **테스트 코드**: `JwtAuthGuard`, `RolesGuard`, 프록시 로직(`AppService`, `AppController`) 등 핵심 기능에 대한 단위 테스트 및 통합 테스트 코드를 작성하여 안정성을 높입니다.
-* **고급 로깅 및 모니터링**: 요청 추적 ID(Correlation ID) 도입, Winston 또는 Pino 로거 사용, Sentry/Datadog 등 외부 모니터링 도구 연동을 고려합니다.
+* **Public 경로 명시적 처리 및 라우팅**: (개선됨) `AppController`에 Public 경로 핸들러를 명시적으로 추가하고, `HealthController`를 위한 `/api/v1/health` 경로를 `AppModule`의 `RouterModule` 설정을 통해 와일드카드 라우트보다 우선적으로 처리되도록 조정했습니다.
+* **API 문서화 (Swagger/OpenAPI)**: (구현됨) `@nestjs/swagger`를 사용하여 API 문서를 자동 생성하고 `/api/v1/api-docs`를 통해 UI를 제공합니다. 로그인 요청 본문에 대한 스키마도 `@ApiBody`를 통해 명시했습니다.
+* **확장된 헬스 체크**: (구현됨) `@nestjs/terminus`를 사용하여 Gateway 자체 및 하위 서비스의 상태를 점검하는 `/api/v1/health` 엔드포인트를 제공합니다.
+* **요청/응답 로깅**: (일부 구현됨) `AppService`에서 프록시 대상 URL 및 요청 본문을 로깅합니다. 향후 Winston 또는 Pino와 같은 전문 로거 도입 및 요청 ID(Correlation ID)를 사용한 로깅 강화를 고려할 수 있습니다.
+* **테스트 코드**: `JwtAuthGuard`, `RolesGuard`, 프록시 로직(`AppService`, `AppController`), `HealthController` 등 핵심 기능에 대한 단위 테스트 및 통합 테스트 코드를 작성하여 안정성을 높입니다.
 * **프록시 모듈화**: 현재 `AppService`에 통합된 프록시 로직을 각 마이크로서비스별 프록시 모듈(예: `AuthProxyModule`, `EventProxyModule`)로 분리하여 코드의 응집도를 높이고 유지보수성을 개선합니다.
 * **API 속도 제한 (Rate Limiting)**: `@nestjs/throttler` 등을 사용하여 DoS/DDoS 공격으로부터 시스템을 보호하고 서비스 안정성을 확보합니다.
-* **API 문서화 (Swagger/OpenAPI)**: Gateway를 통해 노출되는 API들에 대한 문서를 Swagger를 이용하여 자동으로 생성하고 제공합니다.
 * **서킷 브레이커 패턴**: 하위 서비스의 장애가 Gateway 전체로 전파되는 것을 막기 위해 서킷 브레이커 패턴(예: `@nestjs/terminus`와 연계) 도입을 고려합니다.
+
+## 7. 트러블슈팅
+
+개발 과정에서 발생했던 주요 문제 및 해결 과정입니다.
+
+### 7.1. `/api/v1/health` 경로 `@Public()` 미작동 및 인증 오류
+
+*   **문제 현상**: `HealthController`의 `check` 메소드에 `@Public()` 데코레이터를 적용했음에도 불구하고, 해당 경로로 요청 시 `JwtAuthGuard`에서 인증 토큰이 없다는 이유로 401 Unauthorized 에러 발생.
+*   **원인 분석**:
+    1.  `AppController`에 정의된 `@All('*')` 와일드카드 라우트가 `HealthController`의 `/health` 경로보다 먼저 요청을 가로채고 있었음.
+    2.  `AppController`의 와일드카드 핸들러에는 `@Public()`이 적용되지 않았으므로, `JwtAuthGuard`와 `RolesGuard`가 인증/인가를 시도함.
+    3.  `Reflector`가 현재 실행 컨텍스트(와일드카드 핸들러)에서 `IS_PUBLIC_KEY` 메타데이터를 찾지 못해 `isPublic` 플래그가 `undefined`로 평가됨.
+*   **해결 과정**:
+    1.  `JwtAuthGuard` 및 `RolesGuard`에 상세 로깅을 추가하여 컨트롤러/핸들러 매칭 상태 및 `@Public()` 메타데이터 인식 여부 확인.
+    2.  `RolesGuard`가 `@Public()` 경로를 올바르게 건너뛸 수 있도록 수정 (초기에 `JwtAuthGuard` 문제로 오인 가능성 있었음).
+    3.  `AppModule`에서 `RouterModule.register`를 사용하여 `/health` 경로를 `HealthModule`로 명시적으로 라우팅하도록 설정.
+        *   초기 시도: `HealthController`의 `@Controller('health')`와 `RouterModule`의 `path: 'health'`가 중복되어 `/api/v1/health/health`로 라우팅되는 문제 발생.
+        *   수정: `HealthController`를 `@Controller()`로 변경하여 `RouterModule`에서 정의한 경로를 사용하도록 함.
+    4.  `AppModule`의 `imports` 배열에서 `HealthModule` 및 `RouterModule.register` 설정을 다른 모듈들보다 앞 순서로 배치하여, `/health` 경로가 `AppController`의 와일드카드 라우트보다 먼저 매칭될 수 있도록 우선순위 조정.
+*   **교훈**: NestJS의 라우팅 우선순위를 이해하고, 특정 경로가 와일드카드에 의해 가려지지 않도록 명시적인 라우팅 설정을 사용하거나 모듈 임포트 순서를 신중히 고려해야 함. Guard 내에서 현재 컨텍스트(컨트롤러, 핸들러)를 정확히 로깅하는 것이 디버깅에 중요.
+
+### 7.2. 로그인 API (`/api/v1/auth/login`) 프록시 시 Auth Server에서 400 Bad Request
+
+*   **문제 현상**: Gateway를 통해 로그인 API 호출 시 Auth Server로부터 400 에러 응답. `@Public()` 데코레이터는 정상 작동.
+*   **원인 분석**: 클라이언트(Postman)에서 Gateway로 로그인 요청 시 요청 본문(username, password)을 포함하지 않음. Gateway는 빈 본문을 Auth Server로 전달했고, Auth Server는 필수 자격 증명 필드 누락으로 400 에러 반환.
+*   **해결 과정**:
+    1.  Gateway의 `AppService.proxyRequest` 로직에서 요청 본문(`req.body`)이 `axiosConfig.data`로 정상 전달되는지 코드 확인 (정상이었음).
+    2.  클라이언트에서 요청 본문에 `username`과 `password`를 JSON 형식으로 올바르게 포함하여 전송하도록 안내.
+    3.  Swagger UI에서 요청 본문 명세를 쉽게 확인하고 테스트할 수 있도록 `AppController`의 `login` 메소드에 `@ApiBody` 데코레이터 추가.
+*   **교훈**: 프록시 관련 문제 시, 프록시 서버 자체의 로직뿐만 아니라 클라이언트의 요청과 최종 목적지 서버의 요구사항까지 전체 흐름을 확인해야 함. API 문서화 도구(`@ApiBody` 등)를 활용하면 클라이언트 개발/테스트에 도움.
+
+### 7.3. 로그인 API 프록시 시 Auth Server 타임아웃 또는 "request aborted"
+
+*   **문제 현상**: Gateway에서 로그인 API 호출 시 Auth Server로부터 응답이 없어 5초 후 타임아웃 발생 (Gateway 로그). 동시에 Auth Server 로그에는 "request aborted" 에러 기록.
+*   **원인 분석**:
+    1.  **초기 원인**: Gateway의 `.env` 파일에 설정된 `AUTH_SERVER_URL` 환경 변수 값이 실제 Auth Server 주소와 일치하지 않아 요청이 제대로 도달하지 못함.
+    2.  **`.env` 수정 후 원인**: Auth Server 내부 로직의 응답 지연 또는 심각한 오류로 인해, Gateway에서 설정한 타임아웃 내에 Auth Server가 응답을 생성하지 못함. Gateway가 타임아웃으로 연결을 먼저 끊자, 요청 본문을 읽고 있던 Auth Server에서 "request aborted" 에러 발생.
+*   **해결 과정**:
+    1.  Gateway의 `.env` 파일에서 `AUTH_SERVER_URL`을 올바른 Auth Server 주소로 수정.
+    2.  Gateway의 `AppService.proxyRequest`에 프록시 대상 URL 및 요청 정보를 로깅하는 코드 추가하여, 요청이 올바른 주소로 전달되는지 확인.
+    3.  문제의 초점을 Auth Server의 내부 응답 생성 로직으로 이동. (사용자가 Auth Server 측의 문제를 해결한 것으로 가정)
+    4.  (디버깅 중 임시 조치) Gateway의 `HttpModule` 타임아웃 설정을 늘려 Auth Server가 응답할 시간을 더 확보.
+*   **교훈**: 마이크로서비스 간 통신 문제 발생 시, 각 서비스의 환경 변수 설정, 네트워크 경로, 그리고 각 서비스 내부의 로그를 면밀히 확인해야 함. 한쪽 서비스의 타임아웃은 다른 쪽 서비스의 예기치 않은 에러(예: "request aborted")를 유발할 수 있으므로 연관 관계를 파악하는 것이 중요.
+
+---
