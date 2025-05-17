@@ -73,26 +73,24 @@ export class EventsService {
       filter.status = status;
     }
 
-    const dateFilters: any = {};
-    if (startDateAfter) {
-      dateFilters.$gte = startDateAfter;
-    }
-    if (startDateBefore) {
-      dateFilters.$lte = startDateBefore;
-    }
-    if (Object.keys(dateFilters).length > 0) {
-      filter.startDate = dateFilters;
+    // 날짜 필터 생성 함수
+    const createDateFilter = (afterDate?: Date, beforeDate?: Date) => {
+      const dateFilter: any = {};
+      if (afterDate) dateFilter.$gte = afterDate;
+      if (beforeDate) dateFilter.$lte = beforeDate;
+      return Object.keys(dateFilter).length > 0 ? dateFilter : null;
+    };
+
+    // startDate 필터 적용
+    const startDateFilter = createDateFilter(startDateAfter, startDateBefore);
+    if (startDateFilter) {
+      filter.startDate = startDateFilter;
     }
 
-    const endDateFilters: any = {};
-    if (endDateAfter) {
-      endDateFilters.$gte = endDateAfter;
-    }
-    if (endDateBefore) {
-      endDateFilters.$lte = endDateBefore;
-    }
-    if (Object.keys(endDateFilters).length > 0) {
-      filter.endDate = endDateFilters;
+    // endDate 필터 적용
+    const endDateFilter = createDateFilter(endDateAfter, endDateBefore);
+    if (endDateFilter) {
+      filter.endDate = endDateFilter;
     }
 
     const sort: Record<string, 1 | -1> = {};

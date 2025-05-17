@@ -8,6 +8,7 @@ import {
   Delete,
   Req,
   Query,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -19,6 +20,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { ParseObjectIdPipe } from '@nestjs/mongoose';
 
 @ApiTags('이벤트 API')
 @ApiBearerAuth('accessToken')
@@ -37,6 +39,9 @@ export class EventsController {
   @ApiResponse({ status: 403, description: '권한 없음' })
   create(@Body() createEventDto: CreateEventDto, @Req() req: any) {
     const userId = req.headers['x-user-id'];
+    if (!userId) {
+      throw new UnauthorizedException('사용자 ID가 필요합니다.');
+    }
     return this.eventsService.create(createEventDto, userId);
   }
 
@@ -61,7 +66,7 @@ export class EventsController {
   })
   @ApiResponse({ status: 200, description: '이벤트 상세 정보 조회 성공' })
   @ApiResponse({ status: 404, description: '이벤트를 찾을 수 없음' })
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', new ParseObjectIdPipe()) id: string) {
     return this.eventsService.findOne(id);
   }
 
@@ -81,6 +86,9 @@ export class EventsController {
     @Req() req: any,
   ) {
     const userId = req.headers['x-user-id'];
+    if (!userId) {
+      throw new UnauthorizedException('사용자 ID가 필요합니다.');
+    }
     return this.eventsService.update(id, updateEventDto, userId);
   }
 
@@ -95,6 +103,9 @@ export class EventsController {
   @ApiResponse({ status: 404, description: '이벤트를 찾을 수 없음' })
   remove(@Param('id') id: string, @Req() req: any) {
     const userId = req.headers['x-user-id'];
+    if (!userId) {
+      throw new UnauthorizedException('사용자 ID가 필요합니다.');
+    }
     return this.eventsService.remove(id, userId);
   }
 }

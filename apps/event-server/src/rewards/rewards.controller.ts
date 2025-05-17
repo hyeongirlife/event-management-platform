@@ -8,10 +8,9 @@ import {
   Delete,
   Query,
   Req,
-  // ParseUUIDPipe,
-  // ParseIntPipe,
+  UnauthorizedException,
 } from '@nestjs/common';
-// import { MessagePattern, Payload } from '@nestjs/microservices';
+
 import { RewardsService } from './rewards.service';
 import { CreateRewardDto } from './dto/create-reward.dto';
 import { UpdateRewardDto } from './dto/update-reward.dto';
@@ -23,6 +22,7 @@ import {
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
+import { ParseObjectIdPipe } from '@nestjs/mongoose';
 
 @ApiTags('보상 API')
 @ApiBearerAuth('accessToken')
@@ -42,6 +42,9 @@ export class RewardsController {
   @ApiResponse({ status: 404, description: '연결하려는 이벤트를 찾을 수 없음' })
   create(@Body() createRewardDto: CreateRewardDto, @Req() req: any) {
     const userId = req.headers['x-user-id'];
+    if (!userId) {
+      throw new UnauthorizedException('사용자 ID가 필요합니다.');
+    }
     return this.rewardsService.create(createRewardDto, userId);
   }
 
@@ -71,7 +74,7 @@ export class RewardsController {
   })
   @ApiResponse({ status: 200, description: '보상 상세 정보 조회 성공' })
   @ApiResponse({ status: 404, description: '보상을 찾을 수 없음' })
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', new ParseObjectIdPipe()) id: string) {
     return this.rewardsService.findOne(id);
   }
 
@@ -90,11 +93,14 @@ export class RewardsController {
     description: '보상 또는 관련 이벤트를 찾을 수 없음',
   })
   update(
-    @Param('id') id: string,
+    @Param('id', new ParseObjectIdPipe()) id: string,
     @Body() updateRewardDto: UpdateRewardDto,
     @Req() req: any,
   ) {
     const userId = req.headers['x-user-id'];
+    if (!userId) {
+      throw new UnauthorizedException('사용자 ID가 필요합니다.');
+    }
     return this.rewardsService.update(id, updateRewardDto, userId);
   }
 
@@ -110,6 +116,9 @@ export class RewardsController {
   @ApiResponse({ status: 404, description: '보상을 찾을 수 없음' })
   remove(@Param('id') id: string, @Req() req: any) {
     const userId = req.headers['x-user-id'];
+    if (!userId) {
+      throw new UnauthorizedException('사용자 ID가 필요합니다.');
+    }
     return this.rewardsService.remove(id, userId);
   }
 }
