@@ -13,14 +13,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath:
-        process.env.NODE_ENV === 'production'
-          ? '.env.production'
-          : process.env.NODE_ENV === 'development'
-            ? '.env.development'
-            : '.env',
-      // We can add validation schema here later if needed
-      // validationSchema: Joi.object({ ... })
+      envFilePath: [`.env.${process.env.NODE_ENV}`, '.env'].filter(Boolean),
     }),
     HttpModule.registerAsync({
       imports: [ConfigModule],
@@ -40,6 +33,9 @@ import { RolesGuard } from './auth/guards/roles.guard';
     AuthModule,
   ],
   controllers: [AppController],
+  /**
+   * @comment: 전역으로 등록되었기 떄문에 다른 모듈에 등록할 필요 없음
+   */
   providers: [
     AppService,
     {

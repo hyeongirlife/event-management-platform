@@ -45,8 +45,10 @@ export class HealthController {
     // 각 서비스의 실제 헬스체크 엔드포인트로 변경해야 합니다.
     // 여기서는 각 서비스의 루트 URL로 가정하고 호출합니다.
     // 예: http://localhost:3001 (AUTH_SERVER_URL이 http://localhost:3001/api/v1 일 경우)
-    const authServiceHealthUrl =
-      authServiceUrl?.replace('/api/v1', '') || authServiceUrl;
+
+    const authServiceHealthUrl = authServiceUrl
+      ? authServiceUrl.replace(/\/api\/v1\/?$/, '')
+      : authServiceUrl;
     const eventServiceHealthUrl =
       eventServiceUrl?.replace('/api/v1', '') || eventServiceUrl;
 

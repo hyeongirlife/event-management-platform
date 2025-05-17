@@ -3,8 +3,6 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
@@ -19,7 +17,7 @@ import { RolesGuard } from './guards/roles.guard';
       inject: [ConfigService], // ConfigService 주입
     }),
   ],
-  providers: [JwtStrategy, JwtAuthGuard, RolesGuard], // Guard들을 providers에 추가
-  exports: [PassportModule, JwtModule, JwtAuthGuard, RolesGuard], // Guard들을 exports에 추가
+  providers: [JwtStrategy],
+  exports: [PassportModule, JwtModule],
 })
 export class AuthModule {}

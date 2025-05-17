@@ -7,10 +7,6 @@
 # Environment variables
 .env
 .env.*
-!.env.example
-!.env.*.example
-!.env.development
-!.env.production
 
 # IDE specific files (if any specific to this sub-project)
 # .idea/
