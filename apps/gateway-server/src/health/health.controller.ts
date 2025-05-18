@@ -8,7 +8,12 @@ import {
 } from '@nestjs/terminus';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '../auth/decorators/public.decorator';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
 @ApiTags('헬스 체크')
 @Controller()
@@ -22,8 +27,9 @@ export class HealthController {
   ) {}
 
   @Get()
+  // @Public() // 헬스 체크는 일반적으로 인증 없이 접근 가능
+  @ApiBearerAuth('JWT-auth')
   @HealthCheck()
-  @Public() // 헬스 체크는 일반적으로 인증 없이 접근 가능
   @ApiOperation({
     summary: '시스템 전체 상태 확인',
     description:
@@ -52,6 +58,8 @@ export class HealthController {
     const eventServiceHealthUrl =
       eventServiceUrl?.replace('/api/v1', '') || eventServiceUrl;
 
+    console.log('authServiceUrl', authServiceHealthUrl);
+    console.log('eventServiceUrl', eventServiceHealthUrl);
     return this.health.check([
       () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024), // 150MB 힙 메모리 제한
       () => this.memory.checkRSS('memory_rss', 300 * 1024 * 1024), // 300MB RSS 메모리 제한

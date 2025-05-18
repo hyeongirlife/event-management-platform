@@ -34,7 +34,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
   ],
   controllers: [AppController],
   /**
-   * @comment: 전역으로 등록되었기 떄문에 다른 모듈에 등록할 필요 없음
+   * @comment: 전역으로 등록되었기 떄문에 다른 모듈에 등록할 필요 없음, 만약 인가가 필요없는 API라면 @public 데코레이터 사용하면 됨
    */
   providers: [
     AppService,

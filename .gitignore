@@ -44,10 +44,9 @@ lerna-debug.log*
 # Allow specific .env files for apps (examples, development, production)
 # These should be committed if they don't contain sensitive production secrets
 # or if they are templates/local dev setups.
-!apps/*/.env.example
-!apps/*/.env.development
-!apps/*/.env.production
-!apps/*/.env.*.example # For files like .env.test.example
+.env.development
+.env.production
+
 
 # Still ignore other .env files like .env.local or specific .env files not listed above
 apps/*/.env # This will ignore files like apps/gateway-server/.env if not negated above
