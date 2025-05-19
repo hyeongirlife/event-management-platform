@@ -5,6 +5,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { EventsModule } from './events/events.module';
 import { RewardsModule } from './rewards/rewards.module';
+import { UserRewardsModule } from './user-rewards/user-rewards.module';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard, RolesGuard } from './common/guards';
+import { JwtStrategy } from './common/strategies';
 
 @Module({
   imports: [
@@ -29,8 +33,20 @@ import { RewardsModule } from './rewards/rewards.module';
     }),
     EventsModule,
     RewardsModule,
+    UserRewardsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    JwtStrategy,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
 })
 export class AppModule {}

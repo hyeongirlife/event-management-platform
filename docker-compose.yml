@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  auth-db:
+    image: mongo:6.0
+    container_name: auth-db
+    restart: always
+    ports:
+      - "27019:27017"
+    environment:
+      MONGO_INITDB_DATABASE: auth
+    volumes:
+      - auth-db-data:/data/db
+    networks:
+      - backend
+
+  event-db:
+    image: mongo:6.0
+    container_name: event-db
+    restart: always
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_DATABASE: event
+    volumes:
+      - event-db-data:/data/db
+    networks:
+      - backend
+
+  auth-server:
+    build:
+      context: .
+      dockerfile: apps/auth-server/Dockerfile
+    container_name: auth-server
+    restart: always
+    env_file:
+      - ./apps/auth-server/.env.docker
+    environment:
+      MONGODB_URI: mongodb://auth-db:27017/auth
+    depends_on:
+      - auth-db
+    networks:
+      - backend
+    ports:
+      - "3001:3001"
+
+  event-server:
+    build:
+      context: .
+      dockerfile: apps/event-server/Dockerfile
+    container_name: event-server
+    restart: always
+    env_file:
+      - ./apps/event-server/.env.docker
+    environment:
+      EVENT_MONGODB_URI: mongodb://event-db:27017/event
+    depends_on:
+      - event-db
+    networks:
+      - backend
+    ports:
+      - "3002:3002"
+
+  gateway-server:
+    build:
+      context: .
+      dockerfile: apps/gateway-server/Dockerfile
+    container_name: gateway-server
+    restart: always
+    env_file:
+      - ./apps/gateway-server/.env.docker
+    environment:
+      AUTH_SERVER_URL: http://auth-server:3001
+      EVENT_SERVER_URL: http://event-server:3002
+    depends_on:
+      - auth-server
+      - event-server
+    networks:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  auth-db-data:
+  event-db-data:
+
+networks:
+  backend:
+    driver: bridge 

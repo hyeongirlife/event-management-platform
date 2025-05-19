@@ -263,3 +263,29 @@ Auth Server 개발 및 운영 과정에서 발생할 수 있는 주요 문제와
 * **교훈:** 마이크로서비스 간 통신에서 한쪽의 응답 지연은 다른 서비스의 타임아웃이나 예기치 않은 오류로 이어질 수 있으므로, 각 서비스는 신속하게 응답하거나 명확한 오류를 반환하는 것이 중요합니다. 디버깅 시에는 요청을 받은 서비스(Auth Server) 내부의 로그를 면밀히 확인하여 실제 문제 원인을 파악해야 합니다.
 
 ---
+
+# Auth Server - 실무 트러블슈팅 & 경험 정리
+
+## 1. JWT 발급 및 JwtStrategy
+- JWT 토큰 발급 시 roles, userId, username 등 필요한 정보를 payload에 반드시 포함해야 함.
+- JwtStrategy의 validate()에서 DB 조회로 실제 사용자가 존재하는지, 활성화 상태인지 검증하는 로직을 추가하여 보안 강화.
+- validate()에서 반환하는 객체가 req.user에 할당되므로, roles 등 인가에 필요한 정보가 반드시 포함되어야 함.
+
+## 2. DTO/ValidationPipe
+- DTO에 class-validator 데코레이터가 없으면 property should not exist 등 ValidationPipe 에러가 발생함.
+- @ApiProperty, @IsString 등 Swagger와 class-validator 데코레이터를 병행 사용하여 문서화와 검증을 동시에 만족.
+
+## 3. 인증/인가 실무 패턴
+- JwtAuthGuard, RolesGuard를 APP_GUARD로 전역 등록하여 모든 API에 일관성 있게 인증/인가 적용.
+- @Public() 데코레이터로 인증이 필요 없는 엔드포인트를 명확히 구분.
+
+## 4. 실무적 에러 처리/보안
+- 인증 실패, 인가 실패, 잘못된 요청 등 모든 에러에 대해 한글 메시지와 적절한 HTTP 상태코드로 응답.
+- JWT 토큰이 만료되었거나, payload가 잘못된 경우 UnauthorizedException을 명확히 반환.
+
+## 5. 실무적 확장성
+- roles, userId 등 payload 구조를 표준화하여, event-server 등 다른 서비스와의 연동 시 일관성 유지.
+- 인증/인가 로직을 모듈화하여, MSA 구조에서 재사용 및 유지보수 용이.
+
+---
+면접에서 위 이슈와 해결 경험, 실무적 패턴을 명확히 설명할 수 있도록 준비!

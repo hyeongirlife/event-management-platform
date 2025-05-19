@@ -21,15 +21,6 @@ export class RolesGuard implements CanActivate {
     const handler = context.getHandler();
     const controller = context.getClass();
 
-    const handlerMeta = this.reflector.get(IS_PUBLIC_KEY, handler);
-    const classMeta = this.reflector.get(IS_PUBLIC_KEY, controller);
-    this.logger.debug(
-      `[RolesGuard] Handler metadata for IS_PUBLIC_KEY: ${handlerMeta}`,
-    );
-    this.logger.debug(
-      `[RolesGuard] Class metadata for IS_PUBLIC_KEY: ${classMeta}`,
-    );
-
     // @Public() 데코레이터가 있는지 먼저 확인
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       handler,
@@ -37,21 +28,14 @@ export class RolesGuard implements CanActivate {
     ]);
 
     const requestUrl = context.switchToHttp().getRequest().url;
-    this.logger.debug(
-      `[RolesGuard] Path: ${requestUrl}, Controller: ${controller.name}, Handler: ${handler.name}`,
-    );
-    this.logger.debug(`[RolesGuard] isPublic flag evaluated to: ${isPublic}`);
 
     if (isPublic) {
       this.logger.log(
-        `[RolesGuard] Public route detected: ${requestUrl}. Bypassing RolesGuard.`,
+        `[RolesGuard] Pulic 데코레이터가 적용됐습니다. : ${requestUrl}. RoleGuard를 통과합니다.`,
       );
       return true; // Public이면 RolesGuard 통과
     }
 
-    this.logger.log(
-      `[RolesGuard] Protected route: ${requestUrl}. Proceeding with role check.`,
-    );
     // @Roles() 데코레이터에 설정된 역할들을 가져옴
     const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
       ROLES_KEY,
@@ -70,9 +54,7 @@ export class RolesGuard implements CanActivate {
     // 사용자가 없거나 사용자에게 역할 정보가 없으면 접근 거부 (Forbidden)
     // JwtAuthGuard가 먼저 실행되므로 user 객체는 존재한다고 가정할 수 있으나, 방어적으로 체크
     if (!user || !user.roles || user.roles.length === 0) {
-      throw new ForbiddenException(
-        'User has no roles assigned or user object is missing.',
-      );
+      throw new ForbiddenException('역할이 존재하지 않는 유저입니다.');
     }
 
     // 사용자의 역할 중 하나라도 requiredRoles에 포함되는지 확인
@@ -81,7 +63,9 @@ export class RolesGuard implements CanActivate {
     );
 
     if (!hasRequiredRole) {
-      throw new ForbiddenException('User does not have the required role(s).');
+      throw new ForbiddenException(
+        '해당 API에 요구하는 역할과 일치하지 않습니다.',
+      );
     }
 
     return true; // 모든 검사를 통과하면 접근 허용

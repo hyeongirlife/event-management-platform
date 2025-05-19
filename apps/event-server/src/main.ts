@@ -23,8 +23,13 @@ async function bootstrap() {
 
   // Swagger 설정
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('이벤트 보상 플랫폼 - Event Server API')
-    .setDescription('Event Server의 API 명세서입니다.')
+    .setTitle('이벤트 서버 API')
+    .setDescription(
+      'Nexon 이벤트 관리 플랫폼을 위한 이벤트 서버 API 문서입니다.',
+    )
+    .addTag('이벤트', '이벤트 관리 관련 API')
+    .addTag('보상', '보상 관리 관련 API')
+    .addTag('사용자 보상', '사용자 보상 관리 관련 API')
     .setVersion('1.0')
     .addBearerAuth(
       {
@@ -35,7 +40,7 @@ async function bootstrap() {
         description: 'Enter JWT token',
         in: 'header',
       },
-      'accessToken',
+      'JWT-auth',
     )
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);

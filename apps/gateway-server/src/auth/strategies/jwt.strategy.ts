@@ -37,6 +37,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!payload || !payload.sub || !payload.username || !payload.roles) {
       throw new UnauthorizedException('Invalid token payload');
     }
+
+    console.log('payload', payload);
+
     return {
       userId: payload.sub,
       username: payload.username,
