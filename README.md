@@ -4,28 +4,26 @@
 
 본 프로젝트는 NestJS, TypeScript, MongoDB를 기반으로 구축된 마이크로서비스 아키텍처(MSA) 기반 이벤트 보상 플랫폼 백엔드 시스템입니다.
 
+
+## 0. 서버 별 정리된 내용들
+
+`apps/auth-server` `apps/gateway-server` `apps/event-server` 폴더 내 `ReadMe`를 통해 확인하실 수 있습니다.
+
 ## 1. 실행 방법
 
-프로젝트 루트 및 각 서버(`apps/auth-server`, `apps/event-server`, `apps/gateway-server`) 디렉토리에서 다음 명령어를 사용하여 필요한 패키지를 설치합니다.
+```bash
+yarn docker:build
+```
 
 ```bash
-yarn install
+yarn docker:up
 ```
 
 각 서버를 실행하려면 해당 서버 디렉토리로 이동하여 다음 명령어를 실행합니다. (환경 변수 설정 필요 - 각 서버의 `.env.example` 참조)
 
-```bash
-# 개발 모드 (변경 사항 감지 및 자동 재시작)
-yarn start:dev
-
-# 운영 모드
-# yarn build
-# yarn start:prod
-```
-
 **환경 변수 설정:**
 
-각 서버 (`apps/auth-server`, `apps/event-server`, `apps/gateway-server`)의 루트 디렉토리에 있는 `.env.example` 파일을 복사하여 `.env.development` (개발용) 또는 `.env.production` (운영용) 파일을 생성하고, 해당 환경에 맞게 값을 수정해야 합니다.
+도커를 활용해 서버를 운영하는 경우 `.env.docker`를 사용하면 됩니다.
 
 **주요 환경 변수:**
 
@@ -185,7 +183,7 @@ sequenceDiagram
   * **API 속도 제한 (Rate Limiting):** (선택 사항, 실제 프로덕션 고려) 과도한 요청으로 인한 서비스 장애를 방지하기 위해 `Gateway Server`에 API 속도 제한을 적용할 수 있습니다.
 * **감사 추적 (Auditing):**
 
-  * **보상 지급 내역:** "감사 담당자는 지급 내역만 조회할 수 있어야 한다"는 요구사항에 따라, 
+  * **보상 지급 내역:** "감사 담당자는 지급 내역만 조회할 수 있어야 한다"는 요구사항에 따라,
     `user-rewards` 컬렉션(이벤트 서버 소관)에 보상 요청 및 처리와 관련된 모든 중요한 정보를 기록합니다.
     * `userId` (요청한 사용자)
     * `eventId` (관련 이벤트)
@@ -340,52 +338,19 @@ erDiagram
 ## 5. 기술 스택
 
 * **언어**: TypeScript
-* **백엔드 프레임워크**: Node.js, NestJS (최신 버전)
+* **백엔드 프레임워크**: Node.js(18), NestJS (최신 버전)
 * **데이터베이스**: MongoDB
 * **ODM**: Mongoose
 * **인증**: JSON Web Token (JWT)
 * **API 통신**: HTTP/REST (Axios for inter-service communication)
 * **패키지 매니저**: Yarn
 * **버전 관리**: Git
-* **개발 환경**: Docker (선택 사항이지만 권장)
+* **개발 환경**: Docker
 
 ## 7. 향후 개선 및 고려 사항
 
-* **Public 경로 명시적 처리**: Gateway의 `@Public()` 데코레이터를 사용하여 로그인, 회원가입 등의 엔드포인트를 명확히 지정. (현재는 `AppController`의 `@All('*')`로 인해 전역 가드가 모든 경로에 적용됨. 특정 경로에 대한 예외 처리가 필요.)
 * **테스트 코드**: 단위 테스트, 통합 테스트, E2E 테스트 코드 작성.
 * **로깅 및 모니터링**: Winston, Sentry 등을 활용한 고급 로깅 및 모니터링 시스템 구축.
 * **메시지 큐 도입**: 서비스 간 비동기 통신이 필요한 경우 Kafka, RabbitMQ 등 도입 고려.
-* **API 문서화**: Swagger (OpenAPI)를 이용한 API 문서 자동 생성.
 * **CI/CD 파이프라인**: GitHub Actions 등을 이용한 빌드/테스트/배포 자동화.
 * **보안 강화**: Helmet, csurf 등 보안 라이브러리 적용, HTTPS 적용, 정기적인 보안 취약점 점검.
-
-## 8. Docker 환경에서 MongoDB Replica Set 자동 초기화
-
-### 8.1. 자동화 스크립트 제공
-
-루트 디렉토리에 `init-mongo-replica.sh` 스크립트가 포함되어 있습니다. 이 스크립트는 docker-compose로 MongoDB 컨테이너를 기동한 후, 각 DB(auth-db, event-db)에 대해 replica set을 자동으로 초기화합니다.
-
-#### 사용법
-
-1. 컨테이너 빌드 및 기동
-   ```bash
-   docker-compose up -d --build
-   ```
-2. replica set 초기화 스크립트 실행
-   ```bash
-   bash ./init-mongo-replica.sh
-   ```
-
-> 최초 1회만 실행하면 됩니다. (컨테이너 볼륨을 삭제한 경우에는 다시 실행 필요)
-
-#### 스크립트 주요 동작
-
-- 컨테이너가 완전히 기동될 때까지 잠시 대기(sleep 5)
-- 각 MongoDB 컨테이너에 접속하여 `rs.initiate()` 명령 실행
-- 이미 초기화된 경우에도 에러 없이 통과
-
-#### 실무적 참고사항
-
-- 트랜잭션, 세션 기반 작업 등은 반드시 replica set 환경에서만 동작합니다.
-- 운영/테스트/로컬 환경 모두 동일하게 맞추는 것이 안전합니다.
-- CI/CD 파이프라인에서도 이 스크립트를 활용할 수 있습니다.

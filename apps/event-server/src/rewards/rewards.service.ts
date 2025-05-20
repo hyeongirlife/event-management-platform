@@ -305,4 +305,21 @@ export class RewardsService {
   async findByEventId(eventId: string): Promise<Reward[]> {
     return this.rewardModel.find({ eventId, deletedAt: null }).exec();
   }
+
+  async softDeleteByEventId(
+    eventId: string,
+    userId: string,
+    session?: ClientSession,
+  ): Promise<void> {
+    await this.rewardModel.updateMany(
+      { eventId: new Types.ObjectId(eventId), deletedAt: null },
+      {
+        $set: {
+          deletedAt: new Date(),
+          deletedBy: userId,
+        },
+      },
+      { session },
+    );
+  }
 }

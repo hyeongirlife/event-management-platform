@@ -321,4 +321,21 @@ export class UserRewardsService {
       );
     }
   }
+
+  async softDeleteByEventId(
+    eventId: string,
+    userId: string,
+    session?: ClientSession,
+  ): Promise<void> {
+    await this.userRewardEntryModel.updateMany(
+      { eventId: new Types.ObjectId(eventId), deletedAt: { $exists: false } },
+      {
+        $set: {
+          deletedAt: new Date(),
+          updatedBy: userId,
+        },
+      },
+      { session },
+    );
+  }
 }

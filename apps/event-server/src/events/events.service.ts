@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ConflictException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { FilterQuery, Model, Connection, ClientSession } from 'mongoose';
@@ -13,6 +12,8 @@ import {
   FindAllEventsQueryDto,
   SortOrder,
 } from './dto/find-all-events-query.dto';
+import { RewardsService } from '../rewards/rewards.service';
+import { UserRewardsService } from '../user-rewards/user-rewards.service';
 
 // Define a response structure for paginated results
 export interface PaginatedEventsResponse {
@@ -30,6 +31,8 @@ export class EventsService {
   constructor(
     @InjectModel(Event.name) private eventModel: Model<EventDocument>,
     @InjectConnection() private readonly connection: Connection,
+    private readonly rewardsService: RewardsService,
+    private readonly userRewardsService: UserRewardsService,
   ) {}
 
   async create(
@@ -230,6 +233,7 @@ export class EventsService {
       updatePayload.deletedBy = userId;
     }
 
+    // 1. 이벤트 소프트 삭제
     const softDeletedEvent = await this.eventModel
       .findByIdAndUpdate(id, { $set: updatePayload }, { new: true, session })
       .exec();
@@ -239,9 +243,13 @@ export class EventsService {
         `${id}에 해당하는 이벤트를 찾을 수 없습니다. 또는 이미 삭제되었을 수 있습니다.`,
       );
     }
-    // 실제로는 softDeletedEvent는 삭제된 상태의 문서이므로, 반환값을 어떻게 할지 고려 필요
-    // 예를 들어, 삭제 성공 메시지를 반환하거나, 주요 필드만 포함된 객체를 반환할 수 있음
-    // 여기서는 일단 수정된 문서를 반환
+
+    // 2. 해당 이벤트에 연결된 보상들 소프트 삭제
+    await this.rewardsService.softDeleteByEventId(id, userId, session);
+
+    // 3. 해당 이벤트에 연결된 user-reward-entry도 소프트 삭제
+    await this.userRewardsService.softDeleteByEventId(id, userId, session);
+
     return softDeletedEvent;
   }
 }
