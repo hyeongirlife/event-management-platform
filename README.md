@@ -4,7 +4,6 @@
 
 본 프로젝트는 NestJS, TypeScript, MongoDB를 기반으로 구축된 마이크로서비스 아키텍처(MSA) 기반 이벤트 보상 플랫폼 백엔드 시스템입니다.
 
-
 ## 0. 서버 별 정리된 내용들
 
 `apps/auth-server` `apps/gateway-server` `apps/event-server` 폴더 내 `ReadMe`를 통해 확인하실 수 있습니다.
@@ -116,8 +115,8 @@ sequenceDiagram
     Client->>+GW: API 요청 (예: /api/v1/events) (JWT 포함)
     GW->>GW: 1. JwtAuthGuard (토큰 검증)
     GW->>GW: 2. RolesGuard (권한 검증)
-    Note over GW: req.user 생성, X-User-* 헤더 준비
-    GW->>+EventSrv: 프록시 요청 (X-User-* 헤더 포함)
+    Note over GW: req.user 생성, req.user-* 헤더 준비
+    GW->>+EventSrv: 프록시 요청 (req.user-* 헤더 포함)
     EventSrv-->>-GW: 처리 결과
     GW-->>-Client: 최종 응답
 
@@ -203,62 +202,60 @@ sequenceDiagram
 
 ## 4. 데이터베이스 설계 (ERD - Mermaid)
 
-### 4.1. 컬렉션 관계 및 주요 필드 (텍스트 기반)
+### 4.1. 컬렉션 관계 및 주요 필드 (최신 스키마 기준)
 
 * **`users` (Auth Server 소관)**
-
   * `_id`: ObjectId (PK)
-  * `username`: String (고유, 인덱스)
-  * `email`: String (고유, 인덱스)
-  * `password`: String (해시됨)
-  * `roles`: Array of String (Enum: USER, OPERATOR, AUDITOR, ADMIN) - **내장(Embedding)**
+  * `username`: String (고유, 인덱스, 소문자)
+  * `email`: String (고유, 인덱스, 소문자)
+  * `password`: String (bcrypt 해시)
+  * `roles`: Array of String (Enum: USER, OPERATOR, AUDITOR, ADMIN)
   * `createdAt`, `updatedAt`: Date (Mongoose Timestamps)
-* **`reward_definitions` (Event Server 소관)** - 공통 보상 정의
 
-  * `_id`: ObjectId (PK)
-  * `name`: String (보상 이름, 예: "골드 100개", "경험치 부스트 1시간")
-  * `type`: String (Enum: CURRENCY, ITEM, BUFF 등)
-  * `value`: Mixed (보상 값, 예: 100, 'exp_boost_1h_uuid', { itemId: 'sword_001', quantity: 1 })
-  * `description`: String (보상 설명)
-  * `isActive`: Boolean (사용 가능 여부)
-  * `createdAt`, `updatedAt`: Date
 * **`events` (Event Server 소관)**
-
   * `_id`: ObjectId (PK)
-  * `title`: String (이벤트 제목)
+  * `name`: String (고유, 인덱스)
   * `description`: String (이벤트 설명)
+  * `condition`: String (참여/보상 조건)
   * `startDate`: Date (시작일)
   * `endDate`: Date (종료일)
-  * `status`: String (Enum: UPCOMING, ACTIVE, FINISHED, CANCELED)
-  * `conditions`: Array of Object (이벤트 참여/완료 조건) - **내장(Embedding)**
-    * `type`: String (Enum: LOGIN_STREAK, LEVEL_ACHIEVE, QUEST_COMPLETE 등)
-    * `value`: Mixed (조건 값, 예: 7 (7일 연속), 50 (레벨 50), 'main_quest_005_uuid')
-    * `description`: String (조건 설명)
-  * `rewards`: Array of Object (이벤트 보상) - **하이브리드 (RewardDefinition 참조 + 이벤트별 상세 내장)**
-    * `rewardDefinitionId`: ObjectId (FK to `reward_definitions`) - **참조(Referencing)**
-    * `quantity`: Number (수량, 기본값 1) - 이벤트별 상세
-    * `isClaimableOnce`: Boolean (계정당 1회만 수령 가능 여부) - 이벤트별 상세
-    * `customData`: Mixed (해당 이벤트에서 이 보상에만 적용되는 추가 데이터) - 이벤트별 상세
-  * `createdBy`: ObjectId (FK to `users` - OPERATOR/ADMIN의 ID, 참조)
+  * `status`: String (Enum: SCHEDULED, ACTIVE, ENDED, CANCELLED)
+  * `createdBy`: String (생성자 ID)
+  * `updatedBy`: String (수정자 ID)
+  * `deletedAt`: Date (논리 삭제)
+  * `deletedBy`: String (삭제자 ID)
   * `createdAt`, `updatedAt`: Date
-* **`event_reward_requests` (Event Server 소관)** - 사용자 보상 요청/지급 내역
 
+* **`rewards` (Event Server 소관)**
   * `_id`: ObjectId (PK)
-  * `userId`: ObjectId (FK to `users`, 요청 사용자) - **참조(Referencing)**
-  * `eventId`: ObjectId (FK to `events`, 관련 이벤트) - **참조(Referencing)**
-  * `claimedRewards`: Array of Object (사용자가 실제로 지급받은 보상 내역 스냅샷) - **내장(Embedding)**
-    * `rewardDefinitionId`: ObjectId (참조된 보상 정의)
-    * `name`: String (보상 이름 스냅샷)
-    * `type`: String (보상 타입 스냅샷)
-    * `value`: Mixed (보상 값 스냅샷)
-    * `quantity`: Number (지급된 수량)
-  * `status`: String (Enum: PENDING, SUCCESS, FAILED, AWAITING_REVIEW)
-  * `requestedAt`: Date (요청 시간)
-  * `processedAt`: Date (처리 완료 시간)
-  * `processorId`: ObjectId (FK to `users`, 처리한 운영자 ID 또는 시스템의 경우 null/특정값) - **참조(Referencing)**
-  * `failureReason`: String (실패 시 사유)
-  * `notes`: String (관리자/감사자 메모)
+  * `name`: String (보상명)
+  * `type`: String (Enum: POINT, ITEM, COUPON)
+  * `quantity`: Number (수량)
+  * `description`: String (설명)
+  * `itemCode`: String (ITEM 타입일 때)
+  * `couponCode`: String (COUPON 타입일 때)
+  * `eventId`: ObjectId (FK to `events`)
+  * `createdBy`: String (생성자 ID)
+  * `updatedBy`: String (수정자 ID)
+  * `deletedAt`: Date (논리 삭제)
+  * `deletedBy`: String (삭제자 ID)
   * `createdAt`, `updatedAt`: Date
+
+* **`user_reward_entries` (Event Server 소관)**
+  * `_id`: ObjectId (PK)
+  * `userId`: String (FK to `users`)
+  * `eventId`: ObjectId (FK to `events`)
+  * `status`: String (Enum: REQUESTED, PENDING_VALIDATION, VALIDATION_FAILED, PENDING_PAYOUT, REWARDED, FAILED_PAYOUT, DUPLICATE_REQUEST)
+  * `validatedAt`: Date
+  * `rewardedAt`: Date
+  * `failureReason`: String
+  * `grantedRewards`: Array of ObjectId (FK to `rewards`)
+  * `grantedRewardDetails`: Array of Object (보상 상세 스냅샷)
+  * `validationDetails`: Object (검증 상세)
+  * `createdBy`: String
+  * `updatedBy`: String
+  * `createdAt`, `updatedAt`: Date
+  * `deletedAt`: Date (논리 삭제)
 
 ### 4.2. 데이터베이스 ERD (Mermaid)
 
@@ -274,65 +271,61 @@ erDiagram
         Date updatedAt "수정일시"
     }
 
-    reward_definitions {
-        ObjectId _id PK "보상 정의 ID"
-        String name "보상명"
-        String type "보상 타입"
-        Mixed value "보상 값"
-        String description "설명"
-        Boolean isActive "활성 여부"
-        Date createdAt "생성일시"
-        Date updatedAt "수정일시"
-    }
-
     events {
         ObjectId _id PK "이벤트 ID"
-        String title "이벤트명"
+        String name UK "이벤트명"
         String description "설명"
+        String condition "참여/보상 조건"
         Date startDate "시작일"
         Date endDate "종료일"
         String status "상태"
-        Array_Object_ conditions "참여/완료 조건 (내장)"
-        Array_Object_ rewards "이벤트 보상 (하이브리드)"
-        ObjectId createdBy FK "생성자 (운영자ID)"
+        String createdBy "생성자 ID"
+        String updatedBy "수정자 ID"
+        Date deletedAt "논리 삭제"
+        String deletedBy "삭제자 ID"
         Date createdAt "생성일시"
         Date updatedAt "수정일시"
     }
 
-    event_reward_requests {
-        ObjectId _id PK "보상 요청 ID"
-        ObjectId userId FK "요청 사용자 ID"
-        ObjectId eventId FK "관련 이벤트 ID"
-        Array_Object_ claimedRewards "지급된 보상 내역 (내장 스냅샷)"
-        String status "처리 상태"
-        Date requestedAt "요청일시"
-        Date processedAt "처리일시"
-        ObjectId processorId FK "처리자 ID (운영자/시스템)"
+    rewards {
+        ObjectId _id PK "보상 ID"
+        String name "보상명"
+        String type "보상 타입"
+        Number quantity "수량"
+        String description "설명"
+        String itemCode "아이템 코드"
+        String couponCode "쿠폰 코드"
+        ObjectId eventId FK "이벤트 ID"
+        String createdBy "생성자 ID"
+        String updatedBy "수정자 ID"
+        Date deletedAt "논리 삭제"
+        String deletedBy "삭제자 ID"
+        Date createdAt "생성일시"
+        Date updatedAt "수정일시"
+    }
+
+    user_reward_entries {
+        ObjectId _id PK "엔트리 ID"
+        String userId FK "사용자 ID"
+        ObjectId eventId FK "이벤트 ID"
+        String status "상태"
+        Date validatedAt "조건 검증일"
+        Date rewardedAt "보상 지급일"
         String failureReason "실패 사유"
-        String notes "메모"
+        Array_ObjectId_ grantedRewards "지급된 보상 ID 목록"
+        Array_Object_ grantedRewardDetails "지급 보상 상세"
+        Object validationDetails "검증 상세"
+        String createdBy "생성자 ID"
+        String updatedBy "수정자 ID"
         Date createdAt "생성일시"
         Date updatedAt "수정일시"
+        Date deletedAt "논리 삭제"
     }
 
-    users ||--o{ events : "생성 (운영자)"
-    users ||--o{ event_reward_requests : "요청 (사용자)"
-    users ||--o{ event_reward_requests : "처리 (운영자)"
-    events ||--o{ event_reward_requests : "포함"
-    reward_definitions ||--o{ events : "참조 (이벤트별 보상 구성)"
-    reward_definitions ||--o{ event_reward_requests : "참조 (지급 내역 기록)"
-
-
-    %% --- 주석 ---
-    %% PK: Primary Key (기본 키)
-    %% UK: Unique Key (고유 키)
-    %% FK: Foreign Key (외래 키)
-    %% Array_String_ : 문자열 배열
-    %% Array_Object_ : 객체 배열 (상세 구조는 텍스트 설명 참조)
-    %% Mixed : 다양한 타입을 가질 수 있는 필드
-    %% ||--o{ : 1 대 다 관계 (one to many)
-    %% }o--|| : 다 대 1 관계 (many to one) - 거의 사용 안함
-    %% ||--|| : 1 대 1 관계 (one to one)
-    %% }o--o{ : 다 대 다 관계 (many to many)
+    users ||--o{ user_reward_entries : "보상 요청 (userId)"
+    events ||--o{ rewards : "이벤트-보상 (eventId)"
+    events ||--o{ user_reward_entries : "이벤트-유저보상 (eventId)"
+    rewards ||--o{ user_reward_entries : "보상-유저보상 (grantedRewards)"
 ```
 
 ## 5. 기술 스택
