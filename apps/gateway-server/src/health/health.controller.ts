@@ -27,7 +27,7 @@ export class HealthController {
   ) {}
 
   @Get()
-  // @Public() // 헬스 체크는 일반적으로 인증 없이 접근 가능
+  @Public() // 헬스 체크는 일반적으로 인증 없이 접근 가능
   @ApiBearerAuth('JWT-auth')
   @HealthCheck()
   @ApiOperation({
@@ -58,8 +58,6 @@ export class HealthController {
     const eventServiceHealthUrl =
       eventServiceUrl?.replace('/api/v1', '') || eventServiceUrl;
 
-    console.log('authServiceUrl', authServiceHealthUrl);
-    console.log('eventServiceUrl', eventServiceHealthUrl);
     return this.health.check([
       () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024), // 150MB 힙 메모리 제한
       () => this.memory.checkRSS('memory_rss', 300 * 1024 * 1024), // 300MB RSS 메모리 제한

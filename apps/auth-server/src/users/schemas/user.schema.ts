@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, SchemaTypes } from 'mongoose';
+import { Document, HydratedDocument, SchemaTypes } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { UserRole } from '../enums/user-role.enum'; // 역할 Enum (나중에 생성 필요)
 
@@ -29,7 +29,7 @@ const SALT_ROUNDS = 10; // bcrypt salt rounds
     },
   },
 })
-export class User {
+export class User extends Document {
   @Prop({ type: SchemaTypes.ObjectId, auto: true })
   _id: string; // Mongoose가 자동으로 생성하는 ID
 

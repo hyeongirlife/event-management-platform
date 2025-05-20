@@ -1,10 +1,8 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
-import { Request } from 'express';
 import { firstValueFrom } from 'rxjs';
-import { AxiosRequestConfig, AxiosError } from 'axios';
-import { AuthenticatedUser } from './auth/strategies/jwt.strategy';
+import { AxiosError } from 'axios';
 
 // Event Server의 CreateEventDto와 유사한 인터페이스 (필요시 Gateway용 DTO로 분리)
 interface CreateEventPayload {
@@ -62,99 +60,6 @@ export class AppService {
   }
 
   /**
-   * 요청을 프록시하여 다른 서비스로 전달
-   * @param req - 요청 객체
-   * @returns 응답 객체
-   */
-  async proxyRequest(
-    req: Request & { user?: AuthenticatedUser },
-  ): Promise<{ status: number; data: any; headers?: any }> {
-    const { method, originalUrl, body, headers: clientHeaders, user } = req;
-
-    let targetUrl = '';
-    let serviceName = '';
-
-    if (originalUrl.startsWith('/api/v1/auth')) {
-      targetUrl = `${this.authServerUrl}${originalUrl.replace('/api/v1/auth', '')}`;
-      serviceName = 'AuthService';
-    } else if (originalUrl.startsWith('/api/v1/events')) {
-      targetUrl = `${this.eventServerUrl}${originalUrl.replace('/api/v1/events', '')}`;
-      serviceName = 'EventService';
-    } else if (originalUrl.startsWith('/auth')) {
-      targetUrl = `${this.authServerUrl}${originalUrl.replace('/auth', '')}`;
-      serviceName = 'AuthService (no /api/v1 prefix)';
-    } else if (originalUrl.startsWith('/events')) {
-      targetUrl = `${this.eventServerUrl}${originalUrl.replace('/events', '')}`;
-      serviceName = 'EventService (no /api/v1 prefix)';
-    }
-
-    if (!targetUrl) {
-      if (
-        originalUrl === '/' ||
-        originalUrl === '/api/v1' ||
-        originalUrl === '/api/v1/'
-      ) {
-        return {
-          status: HttpStatus.OK,
-          data: { message: 'Gateway is running' },
-        };
-      }
-      throw new HttpException(
-        `Cannot proxy request for path: ${originalUrl}. No matching service.`,
-        HttpStatus.BAD_GATEWAY,
-      );
-    }
-
-    const headersToProxy = { ...clientHeaders };
-    delete headersToProxy['host'];
-    delete headersToProxy['connection'];
-    delete headersToProxy['content-length'];
-
-    if (user) {
-      headersToProxy['x-user-id'] = user.userId;
-      headersToProxy['x-user-username'] = user.username;
-      headersToProxy['x-user-roles'] = user.roles.join(',');
-    }
-
-    const axiosConfig: AxiosRequestConfig = {
-      method: method as any,
-      url: targetUrl,
-      data: body,
-      headers: headersToProxy,
-    };
-
-    this.logger.log(
-      `[ProxyRequest] 게이트웨이 거쳐 요청 하는 URL: ${method} ${originalUrl} -> ${serviceName} (${targetUrl})`,
-    );
-    if (body && Object.keys(body).length > 0) {
-      this.logger.debug(`[ProxyRequest] Request body: ${JSON.stringify(body)}`);
-    }
-
-    try {
-      const response = await firstValueFrom(
-        this.httpService.request(axiosConfig),
-      );
-      return {
-        status: response.status,
-        data: response.data,
-        headers: response.headers,
-      };
-    } catch (error) {
-      const axiosError = error as AxiosError;
-      if (axiosError.isAxiosError && axiosError.response) {
-        throw new HttpException(
-          axiosError.response.data,
-          axiosError.response.status,
-        );
-      }
-      throw new HttpException(
-        `Error proxying request to ${targetUrl}: ${error.message}`,
-        HttpStatus.BAD_GATEWAY,
-      );
-    }
-  }
-
-  /**
    * Event Server에 이벤트 생성 요청
    * @param userId - 사용자 ID
    * @param eventData - 이벤트 데이터
@@ -174,7 +79,7 @@ export class AppService {
       'x-user-id': userId,
     };
 
-    const axiosConfig: AxiosRequestConfig = {
+    const axiosConfig = {
       method: 'POST',
       url: targetUrl,
       data: eventData,
@@ -221,7 +126,7 @@ export class AppService {
       `[FindAllEvents] Event Server API 호출: GET ${targetUrl} with query ${JSON.stringify(query)}`,
     );
 
-    const axiosConfig: AxiosRequestConfig = {
+    const axiosConfig = {
       method: 'GET',
       url: targetUrl,
       params: query, // GET 요청이므로 params로 전달
@@ -263,7 +168,7 @@ export class AppService {
     const targetUrl = `${this.eventServerUrl}/events/${id}`;
     this.logger.log(`[FindOneEvent] Event Server API 호출: GET ${targetUrl}`);
 
-    const axiosConfig: AxiosRequestConfig = {
+    const axiosConfig = {
       method: 'GET',
       url: targetUrl,
     };
@@ -317,7 +222,7 @@ export class AppService {
       'x-user-id': userId,
     };
 
-    const axiosConfig: AxiosRequestConfig = {
+    const axiosConfig = {
       method: 'PATCH',
       url: targetUrl,
       data: payload,
@@ -367,7 +272,7 @@ export class AppService {
       'x-user-id': userId,
     };
 
-    const axiosConfig: AxiosRequestConfig = {
+    const axiosConfig = {
       method: 'DELETE',
       url: targetUrl,
       headers: headers,

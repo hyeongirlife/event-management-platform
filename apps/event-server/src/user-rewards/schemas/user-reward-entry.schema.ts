@@ -1,71 +1,72 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, HydratedDocument, Types } from 'mongoose';
-import { Event } from '../../events/schemas/event.schema';
-import { Reward } from '../../rewards/schemas/reward.schema'; // 지급된 보상 정보 연결 (선택적)
+import { Document, Schema as MongooseSchema } from 'mongoose';
+// import { Event } from '../../events/schemas/event.schema'; // Event 스키마는 직접 참조하지 않으므로 주석 처리 또는 삭제
+// import { Reward } from '../../rewards/schemas/reward.schema'; // Reward 스키마는 직접 참조하지 않으므로 주석 처리 또는 삭제
 
-// 유저 보상 요청 상태
+// 사용자 보상 요청 처리 상태 Enum
 export enum UserRewardEntryStatus {
-  REQUESTED = 'REQUESTED', // 보상 요청됨 (조건 검증 전)
-  PENDING_VALIDATION = 'PENDING_VALIDATION', // 조건 검증 중
-  VALIDATION_FAILED = 'VALIDATION_FAILED', // 조건 미충족으로 실패
-  PENDING_PAYOUT = 'PENDING_PAYOUT', // 조건 충족, 보상 지급 대기
-  REWARDED = 'REWARDED', // 보상 지급 완료
-  FAILED_PAYOUT = 'FAILED_PAYOUT', // 보상 지급 실패 (시스템 오류 등)
-  DUPLICATE_REQUEST = 'DUPLICATE_REQUEST', // 중복 요청
-  // CANCELLED_BY_USER = 'CANCELLED_BY_USER', // 사용자에 의한 요청 취소 (필요시)
-  // CANCELLED_BY_SYSTEM = 'CANCELLED_BY_SYSTEM', // 시스템에 의한 취소 (이벤트 취소 등)
+  REQUESTED = 'REQUESTED', // 사용자가 보상 요청 (조건 검증 전)
+  PENDING_VALIDATION = 'PENDING_VALIDATION', // 조건 검증 진행 중 (필요시 사용)
+  VALIDATION_FAILED = 'VALIDATION_FAILED', // 조건 검증 실패
+  PENDING_PAYOUT = 'PENDING_PAYOUT', // 조건 검증 성공, 보상 지급 대기 중
+  REWARDED = 'REWARDED', // 보상 지급 성공
+  FAILED_PAYOUT = 'FAILED_PAYOUT', // 보상 지급 실패 (지급 시스템 오류 등)
+  DUPLICATE_REQUEST = 'DUPLICATE_REQUEST', // 중복 요청 (이미 처리된 요청이 있을 경우)
 }
 
-export type UserRewardEntryDocument = HydratedDocument<UserRewardEntry>;
-
 @Schema({ timestamps: true, collection: 'user_reward_entries' })
-export class UserRewardEntry {
-  @Prop({ required: true, index: true }) // Gateway에서 받은 X-User-Id
+export class UserRewardEntry extends Document {
+  @Prop({ required: true, type: String, index: true })
   userId: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'Event', required: true, index: true })
-  eventId: Types.ObjectId;
-
-  // 사용자가 특정 보상을 선택해서 요청하는 경우 Reward ID도 저장할 수 있음
-  // @Prop({ type: Types.ObjectId, ref: 'Reward', index: true })
-  // requestedRewardId?: Types.ObjectId;
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Event', // Event 모델 이름 문자열로 참조
+    required: true,
+    index: true,
+  })
+  eventId: MongooseSchema.Types.ObjectId;
 
   @Prop({
-    required: true,
     type: String,
-    enum: Object.values(UserRewardEntryStatus),
+    enum: UserRewardEntryStatus,
+    required: true,
     default: UserRewardEntryStatus.REQUESTED,
+    index: true,
   })
   status: UserRewardEntryStatus;
 
-  @Prop({ type: Date }) // 조건 검증 완료 시간
+  @Prop({ type: Date })
   validatedAt?: Date;
 
-  @Prop({ type: Date }) // 보상 지급 완료 시간
+  @Prop({ type: Date })
   rewardedAt?: Date;
 
-  @Prop({ type: String }) // 조건 검증 실패 또는 지급 실패 사유
+  @Prop({ type: String })
   failureReason?: string;
 
-  // 실제 지급된 보상 내역 (여러 개일 수 있으므로 배열 또는 별도 스키마 참조)
-  // 이 부분은 보상이 단일 아이템/포인트로 고정적인지, 여러 개 중 선택인지 등에 따라 설계 변경 가능
-  @Prop({ type: [{ type: Types.ObjectId, ref: 'Reward' }] })
-  grantedRewards?: Types.ObjectId[]; // 실제 지급된 Reward ID 목록
+  @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Reward' }] }) // Reward 모델 이름 문자열로 참조
+  grantedRewards?: MongooseSchema.Types.ObjectId[];
 
-  @Prop({ type: Object }) // 지급된 보상의 상세 내용 (스냅샷, 예: { type: 'POINT', quantity: 100 })
-  grantedRewardDetails?: Record<string, any>; // 또는 명확한 인터페이스/타입 정의
+  @Prop({ type: [MongooseSchema.Types.Mixed] })
+  grantedRewardDetails?: Record<string, any>[];
 
-  // 트랜잭션 ID 또는 외부 시스템 연동 ID (필요시)
-  // @Prop({ type: String, index: true })
-  // transactionId?: string;
+  @Prop({ type: MongooseSchema.Types.Mixed })
+  validationDetails?: Record<string, any>;
+
+  @Prop({ type: String })
+  createdBy?: string;
+
+  @Prop({ type: String })
+  updatedBy?: string;
+
+  // Mongoose timestamps 옵션에 의해 자동 생성되지만, 타입 추론을 위해 명시
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const UserRewardEntrySchema =
   SchemaFactory.createForClass(UserRewardEntry);
 
-// 중복 보상 요청을 막기 위한 복합 고유 인덱스 (userId, eventId 조합)
-// 만약 eventId 내에서도 여러번 참여/보상 요청이 가능하다면 이 인덱스는 부적합.
-// "유저는 특정 이벤트에 대해 보상을 요청할 수 있어야 합니다." -> 이벤트당 1회 요청으로 해석
 UserRewardEntrySchema.index({ userId: 1, eventId: 1 }, { unique: true });
-
-UserRewardEntrySchema.index({ status: 1, updatedAt: -1 }); // 특정 상태의 항목을 최근 업데이트 순으로 조회
+UserRewardEntrySchema.index({ status: 1, updatedAt: -1 });

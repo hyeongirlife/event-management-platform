@@ -3,8 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { FilterQuery, Model, Connection, ClientSession } from 'mongoose';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { Event, EventDocument, EventStatus } from './schemas/event.schema';
@@ -12,6 +12,8 @@ import {
   FindAllEventsQueryDto,
   SortOrder,
 } from './dto/find-all-events-query.dto';
+import { RewardsService } from '../rewards/rewards.service';
+import { UserRewardsService } from '../user-rewards/user-rewards.service';
 
 // Define a response structure for paginated results
 export interface PaginatedEventsResponse {
@@ -28,11 +30,15 @@ export interface PaginatedEventsResponse {
 export class EventsService {
   constructor(
     @InjectModel(Event.name) private eventModel: Model<EventDocument>,
+    @InjectConnection() private readonly connection: Connection,
+    private readonly rewardsService: RewardsService,
+    private readonly userRewardsService: UserRewardsService,
   ) {}
 
   async create(
     createEventDto: CreateEventDto,
     userId?: string,
+    session?: ClientSession,
   ): Promise<Event> {
     const eventToCreate = {
       ...createEventDto,
@@ -41,7 +47,7 @@ export class EventsService {
       ...(userId && { createdBy: userId }), // userId가 제공되면 createdBy 설정
     };
     const createdEvent = new this.eventModel(eventToCreate);
-    return createdEvent.save();
+    return createdEvent.save({ session });
   }
 
   async findAll(
@@ -133,6 +139,7 @@ export class EventsService {
     id: string,
     updateEventDto: UpdateEventDto,
     userId?: string,
+    session?: ClientSession,
   ): Promise<Event> {
     // 1. 현재 이벤트 정보 조회 (deletedAt: null 조건 포함)
     const currentEvent = await this.findOne(id);
@@ -200,7 +207,10 @@ export class EventsService {
     }
 
     const updatedEvent = await this.eventModel
-      .findOneAndUpdate({ _id: id, deletedAt: null }, payload, { new: true })
+      .findOneAndUpdate({ _id: id, deletedAt: null }, payload, {
+        new: true,
+        session,
+      })
       .exec();
 
     if (!updatedEvent) {
@@ -211,7 +221,11 @@ export class EventsService {
     return updatedEvent;
   }
 
-  async remove(id: string, userId?: string): Promise<Event> {
+  async remove(
+    id: string,
+    userId?: string,
+    session?: ClientSession,
+  ): Promise<Event> {
     const updatePayload: { deletedAt: Date; deletedBy?: string } = {
       deletedAt: new Date(),
     };
@@ -219,8 +233,9 @@ export class EventsService {
       updatePayload.deletedBy = userId;
     }
 
+    // 1. 이벤트 소프트 삭제
     const softDeletedEvent = await this.eventModel
-      .findByIdAndUpdate(id, { $set: updatePayload }, { new: true })
+      .findByIdAndUpdate(id, { $set: updatePayload }, { new: true, session })
       .exec();
 
     if (!softDeletedEvent) {
@@ -228,9 +243,13 @@ export class EventsService {
         `${id}에 해당하는 이벤트를 찾을 수 없습니다. 또는 이미 삭제되었을 수 있습니다.`,
       );
     }
-    // 실제로는 softDeletedEvent는 삭제된 상태의 문서이므로, 반환값을 어떻게 할지 고려 필요
-    // 예를 들어, 삭제 성공 메시지를 반환하거나, 주요 필드만 포함된 객체를 반환할 수 있음
-    // 여기서는 일단 수정된 문서를 반환
+
+    // 2. 해당 이벤트에 연결된 보상들 소프트 삭제
+    await this.rewardsService.softDeleteByEventId(id, userId, session);
+
+    // 3. 해당 이벤트에 연결된 user-reward-entry도 소프트 삭제
+    await this.userRewardsService.softDeleteByEventId(id, userId, session);
+
     return softDeletedEvent;
   }
 }

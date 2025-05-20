@@ -18,7 +18,6 @@
     "test:cov": "echo \"Please specify an app to test:cov, e.g., yarn test:cov:auth\"",
     "test:debug": "echo \"Please specify an app to test:debug, e.g., yarn test:debug:auth\"",
     "test:e2e": "echo \"Please specify an app to test:e2e, e.g., yarn test:e2e:auth\"",
-
     "start:auth": "cd apps/auth-server && yarn start",
     "start:dev:auth": "cd apps/auth-server && yarn start:dev",
     "start:prod:auth": "cd apps/auth-server && yarn start:prod",
@@ -29,7 +28,6 @@
     "test:cov:auth": "cd apps/auth-server && yarn test:cov",
     "test:debug:auth": "cd apps/auth-server && yarn test:debug",
     "test:e2e:auth": "cd apps/auth-server && yarn test:e2e",
-
     "start:event": "cd apps/event-server && yarn start",
     "start:dev:event": "cd apps/event-server && yarn start:dev",
     "start:prod:event": "cd apps/event-server && yarn start:prod",
@@ -40,7 +38,6 @@
     "test:cov:event": "cd apps/event-server && yarn test:cov",
     "test:debug:event": "cd apps/event-server && yarn test:debug",
     "test:e2e:event": "cd apps/event-server && yarn test:e2e",
-
     "start:gateway": "cd apps/gateway-server && yarn start",
     "start:dev:gateway": "cd apps/gateway-server && yarn start:dev",
     "start:prod:gateway": "cd apps/gateway-server && yarn start:prod",
@@ -50,12 +47,35 @@
     "test:watch:gateway": "cd apps/gateway-server && yarn test:watch",
     "test:cov:gateway": "cd apps/gateway-server && yarn test:cov",
     "test:debug:gateway": "cd apps/gateway-server && yarn test:debug",
-    "test:e2e:gateway": "cd apps/gateway-server && yarn test:e2e"
+    "test:e2e:gateway": "cd apps/gateway-server && yarn test:e2e",
+
+    "docker:build": "docker-compose build --no-cache",
+    "docker:up": "docker-compose up -d --build && bash ./init-mongo-replica.sh",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f --tail=100",
+
+    "docker:build:auth": "docker-compose build --no-cache auth-server",
+    "docker:up:auth": "docker-compose up -d auth-server",
+    "docker:down:auth": "docker-compose down auth-server",
+    "docker:logs:auth": "docker-compose logs -f --tail=100 auth-server",
+
+    "docker:build:event": "docker-compose build --no-cache event-server",
+    "docker:up:event": "docker-compose up -d event-server",
+    "docker:down:event": "docker-compose down event-server",
+    "docker:logs:event": "docker-compose logs -f --tail=100 event-server",
+
+    "docker:build:gateway": "docker-compose build --no-cache gateway-server",
+    "docker:up:gateway": "docker-compose up -d gateway-server",
+    "docker:down:gateway": "docker-compose down gateway-server",
+    "docker:logs:gateway": "docker-compose logs -f --tail=100 gateway-server"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.0.0",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1"
   },

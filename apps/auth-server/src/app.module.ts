@@ -19,7 +19,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
         uri: configService.get<string>('MONGODB_URI'),
-        dbName: configService.get<string>('MONGODB_DB_NAME', 'event_auth_dev'),
+        dbName: configService.get<string>('MONGODB_DB_NAME'),
       }),
     }),
     UsersModule,

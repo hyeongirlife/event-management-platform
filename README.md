@@ -4,7 +4,38 @@
 
 본 프로젝트는 NestJS, TypeScript, MongoDB를 기반으로 구축된 마이크로서비스 아키텍처(MSA) 기반 이벤트 보상 플랫폼 백엔드 시스템입니다.
 
-## 1. 프로젝트 목표 및 요구사항
+
+## 0. 서버 별 정리된 내용들
+
+`apps/auth-server` `apps/gateway-server` `apps/event-server` 폴더 내 `ReadMe`를 통해 확인하실 수 있습니다.
+
+## 1. 실행 방법
+
+```bash
+yarn docker:build
+```
+
+```bash
+yarn docker:up
+```
+
+각 서버를 실행하려면 해당 서버 디렉토리로 이동하여 다음 명령어를 실행합니다. (환경 변수 설정 필요 - 각 서버의 `.env.example` 참조)
+
+**환경 변수 설정:**
+
+도커를 활용해 서버를 운영하는 경우 `.env.docker`를 사용하면 됩니다.
+
+**주요 환경 변수:**
+
+* `PORT`: 각 서버가 실행될 포트 번호
+* `MONGODB_URI`: MongoDB 접속 주소
+* `MONGODB_DB_NAME`: 사용할 데이터베이스 이름
+* `JWT_SECRET`: JWT 서명 및 검증에 사용될 비밀 키 (모든 서버가 동일한 값을 사용해야 함)
+* `JWT_EXPIRES_IN`: JWT 유효 기간 (예: `60m`, `1d`)
+* `AUTH_SERVER_URL` (Gateway Server용): Auth Server의 주소
+* `EVENT_SERVER_URL` (Gateway Server용): Event Server의 주소
+
+## 2. 프로젝트 목표 및 요구사항
 
 * 게임 내 다양한 이벤트 생성 및 보상 정의 기능
 * 사용자의 이벤트 참여 및 조건 달성 시 보상 요청 기능
@@ -12,9 +43,9 @@
 * 감사 담당자의 보상 지급 내역 조회 기능
 * 안정적이고 확장 가능한 백엔드 시스템 구축
 
-## 2. 아키텍처 및 주요 흐름
+## 3. 아키텍처 및 주요 흐름
 
-### 2.1. 시스템 구성도 (Mermaid)
+### 3.1. 시스템 구성도 (Mermaid)
 
 ```mermaid
 graph TD
@@ -36,7 +67,7 @@ graph TD
     style EventDB fill:#fdb,stroke:#333,stroke-width:1px
 ```
 
-### 2.2. 서버 역할
+### 3.2. 서버 역할
 
 * **Gateway Server**:
   * API 진입점 (API Gateway) 역할. 모든 외부 요청은 Gateway를 통해 내부 서비스로 라우팅됩니다.
@@ -52,7 +83,7 @@ graph TD
   * 이벤트 조건 및 보상 아이템 정의
   * 사용자의 보상 요청 처리 및 지급 상태 관리 (요청 검증, 보상 지급 로직)
 
-### 2.3. Gateway Server 주요 동작
+### 3.3. Gateway Server 주요 동작
 
 1. **API 진입점**: 모든 외부 요청은 Gateway Server의 `/api/v1` 전역 접두사를 통해 시스템으로 진입합니다.
 2. **전역 인증/인가 Guard**:
@@ -72,7 +103,7 @@ graph TD
 4. **Gateway 상태 확인**:
    * Gateway의 루트 경로 (`/api/v1/`)로 GET 요청 시, "Gateway is running" 메시지를 반환하여 서비스 상태를 확인할 수 있습니다. (이 경로는 `@Public()`으로 처리하는 것이 좋습니다.)
 
-### 2.4. 주요 요청 흐름 예시 (Mermaid)
+### 3.4. 주요 요청 흐름 예시 (Mermaid)
 
 ```mermaid
 %% 서비스 상호작용도 (Service Interaction Diagram)
@@ -98,9 +129,9 @@ sequenceDiagram
     GW-->>-Client: JWT 전달
 ```
 
-## 3. 설계 결정 사항 및 고려 사항
+## 4. 설계 결정 사항 및 고려 사항
 
-### 3.1. ODM (Object Data Mapper) 선택: Mongoose
+### 4.1. ODM (Object Data Mapper) 선택: Mongoose
 
 본 프로젝트에서는 NestJS와 MongoDB를 연동하기 위한 ODM으로 **Mongoose**를 선택했습니다. 주요 이유는 다음과 같습니다.
 
@@ -112,7 +143,7 @@ sequenceDiagram
 
 *대안으로 MikroORM도 고려되었으나, MongoDB와의 직접적인 연동 편의성, NestJS 생태계에서의 일반적인 사용 빈도, 그리고 Mongoose가 제공하는 스키마 중심의 개발 방식이 본 프로젝트의 특성에 더 부합한다고 판단했습니다.*
 
-### 3.2. MSA 환경에서의 데이터 일관성
+### 4.2. MSA 환경에서의 데이터 일관성
 
 본 프로젝트는 Gateway Server, Auth Server, Event Server로 구성된 마이크로서비스 아키텍처(MSA)를 따릅니다. MSA 환경에서는 각 서비스가 독립적인 데이터 저장소를 가지므로 데이터 일관성 유지가 중요한 고려 사항입니다.
 
@@ -125,7 +156,7 @@ sequenceDiagram
 
   * **최종 일관성 (Eventual Consistency):** 대부분의 경우 최종 일관성 모델을 따릅니다. 예를 들어, 사용자가 `Auth Server`에서 생성된 후, 해당 사용자 정보가 `Event Server`에서 즉시 보이지 않을 수 있지만, 결국에는 동기화되어 일관성을 유지합니다. 이벤트 목록 조회나 보상 내역 조회 등은 최종 일관성으로 충분히 처리 가능합니다.
   * **강한 일관성 (Strong Consistency) 필요 지점:**
-    * **보상 지급 처리:** 사용자가 보상을 요청하고 시스템이 조건 충족 여부를 검증한 후 실제 보상을 지급(또는 지급 상태를 변경)하는 로जिक은 단일 `Event Server` 내에서 트랜잭션과 유사한 방식으로 처리되어야 합니다. 예를 들어, 보상 수량 차감과 사용자 요청 상태 변경은 원자적으로 이루어져야 중복 지급이나 데이터 불일치 문제를 방지할 수 있습니다. MongoDB는 단일 문서 연산에 대해서는 원자성을 보장하며, 여러 문서에 걸친 트랜잭션은 MongoDB 4.0 이상부터 지원됩니다. 상황에 따라 이를 활용하거나, 애플리케이션 레벨에서 상태 관리와 보상 로직을 신중하게 설계하여 일관성을 확보해야 합니다.
+    * **보상 지급 처리:** 사용자가 보상을 요청하고 시스템이 조건 충족 여부를 검증한 후 실제 보상을 지급(또는 지급 상태를 변경)하는 로직은 단일 `Event Server` 내에서 트랜잭션과 유사한 방식으로 처리되어야 합니다. 예를 들어, 보상 수량 차감과 사용자 요청 상태 변경은 원자적으로 이루어져야 중복 지급이나 데이터 불일치 문제를 방지할 수 있습니다. MongoDB는 단일 문서 연산에 대해서는 원자성을 보장하며, 여러 문서에 걸친 트랜잭션은 MongoDB 4.0 이상부터 지원됩니다. 상황에 따라 이를 활용하거나, 애플리케이션 레벨에서 상태 관리와 보상 로직을 신중하게 설계하여 일관성을 확보해야 합니다.
     * **중복 보상 요청 방지:** `Event Server`는 특정 사용자가 특정 이벤트에 대해 이미 보상을 요청했는지 여부를 정확히 확인하고 중복 요청을 막아야 합니다. 이는 `(userId, eventId)` 조합에 대한 고유 인덱스 설정 및 요청 처리 로직에서 강한 일관성을 필요로 합니다.
 * **서비스 간 통신:** 서비스 간 데이터 동기화나 요청은 비동기 메시징 (예: Kafka, RabbitMQ - 과제 범위 초과 시 단순 API 호출) 또는 동기 API 호출을 사용할 수 있습니다. 본 과제에서는 복잡성을 고려하여 주로 동기 API 호출(Gateway를 통한) 방식을 기본으로 하되, 필요에 따라 특정 이벤트 발생 시 다른 서비스에 알리는 방식(예: 웹훅 또는 간단한 이벤트 발행)을 고려할 수 있습니다.
 
@@ -137,13 +168,14 @@ sequenceDiagram
 
   * 모든 API 요청은 `Gateway Server`의 `/api/v1` 접두사를 통해 진입하며, 여기서 일차적인 인증 및 권한 부여가 처리됩니다.
   * **JWT 기반 인증**: `JwtAuthGuard`가 요청 헤더의 `Authorization: Bearer <토큰>`을 검증합니다.
+
     * 유효한 토큰인 경우, 페이로드(사용자 ID, 사용자명, 역할 목록)를 추출하여 `req.user` 객체에 저장합니다.
     * `@Public()` 데코레이터가 적용된 경로(예: 로그인, 회원가입)는 이 토큰 검증을 건너뜁니다.
   * **역할 기반 접근 제어 (RBAC)**: `RolesGuard`가 `JwtAuthGuard` 이후 실행됩니다.
+
     * `@Roles(UserRole.ADMIN, UserRole.OPERATOR, ...)` 데코레이터로 엔드포인트에 필요한 역할을 명시합니다.
     * `req.user.roles`와 필요한 역할을 비교하여, 권한이 없는 경우 `ForbiddenException` (403 에러)을 반환합니다.
     * `@Roles()` 데코레이터가 없는 엔드포인트는 인증된 모든 사용자가 접근 가능합니다.
-  * **하위 서비스로 사용자 정보 전파**: 인증 및 권한 검사를 통과한 요청을 하위 마이크로서비스(Auth Server, Event Server)로 프록시할 때, `X-User-Id`, `X-User-Username`, `X-User-Roles` 헤더에 인증된 사용자 정보를 담아 전달합니다. 이를 통해 각 마이크로서비스는 별도의 토큰 검증 없이 요청 컨텍스트에서 사용자 정보를 활용할 수 있습니다.
 * **데이터 보안:**
 
   * **민감 정보 최소화:** 사용자 비밀번호와 같은 민감 정보는 `Auth Server`에서 안전하게 해시 처리되어 저장됩니다.
@@ -151,18 +183,21 @@ sequenceDiagram
   * **API 속도 제한 (Rate Limiting):** (선택 사항, 실제 프로덕션 고려) 과도한 요청으로 인한 서비스 장애를 방지하기 위해 `Gateway Server`에 API 속도 제한을 적용할 수 있습니다.
 * **감사 추적 (Auditing):**
 
-  * **보상 지급 내역:** "감사 담당자는 지급 내역만 조회할 수 있어야 한다"는 요구사항에 따라, `EventRewardRequest` 컬렉션(또는 유사한 이름의 컬렉션, `Event Server` 소관)에 보상 요청 및 처리와 관련된 모든 중요한 정보를 기록합니다.
+  * **보상 지급 내역:** "감사 담당자는 지급 내역만 조회할 수 있어야 한다"는 요구사항에 따라,
+    `user-rewards` 컬렉션(이벤트 서버 소관)에 보상 요청 및 처리와 관련된 모든 중요한 정보를 기록합니다.
     * `userId` (요청한 사용자)
     * `eventId` (관련 이벤트)
-    * `rewardDefinitionId` (참조된 보상 정의)
-    * `claimedRewardDetails` (실제 지급된 보상 내용 스냅샷)
+    * `grantedRewards` (실제 지급된 보상 정보)
     * `requestedAt` (요청 시간)
     * `processedAt` (처리 시간)
-    * `status` (요청 상태: PENDING, SUCCESS, FAILED, REVIEW_PENDING 등)
+    * `status` (요청 상태: PENDING, SUCCESS, FAILED 등)
     * `processor` (처리 주체: 'SYSTEM' 또는 운영자 ID)
-    * `details` (실패 사유, 검토 내용 등 추가 정보)
-  * **타임스탬프:** Mongoose 스키마의 `timestamps: true` 옵션을 활성화하여 모든 주요 데이터 (이벤트 생성/수정, 보상 등록/수정, 요청 생성/수정 등)의 `createdAt`과 `updatedAt`을 자동으로 기록하여 변경 이력을 추적합니다. (각 서비스 레벨에서 구현)
+    * `failureReason` (실패 사유 등)
+    * 기타 감사/운영에 필요한 필드
+  * **타임스탬프:** Mongoose 스키마의 `timestamps: true` 옵션을 활성화하여 모든 주요 데이터(이벤트 생성/수정, 보상 등록/수정, 요청 생성/수정 등)의 `createdAt`과 `updatedAt`을 자동으로 기록합니다. (각 서비스 레벨에서 구현)
   * **운영자 활동 로그 (선택 사항, 확장 고려):** 이벤트 생성/수정, 보상 등록/수정 등 운영자의 주요 활동에 대해서도 별도의 로그를 기록하여 시스템 변경 사항을 추적하고 문제 발생 시 원인 파악을 용이하게 할 수 있습니다. (각 서비스 레벨 또는 별도 로깅 서비스에서 구현)
+
+> ※ 실제 컬렉션/스키마 구조 및 감사 정책, 확장성 고민 등은 `apps/event-server/README.md`에 상세히 정리되어 있습니다.
 
 이러한 고민들은 시스템의 안정성, 확장성, 유지보수성을 높이고, "실제 프로덕션에서 이 코드를 돌려도 될까?"라는 질문에 긍정적으로 답하기 위한 노력의 일환입니다.
 
@@ -303,57 +338,19 @@ erDiagram
 ## 5. 기술 스택
 
 * **언어**: TypeScript
-* **백엔드 프레임워크**: Node.js, NestJS (최신 버전)
+* **백엔드 프레임워크**: Node.js(18), NestJS (최신 버전)
 * **데이터베이스**: MongoDB
 * **ODM**: Mongoose
 * **인증**: JSON Web Token (JWT)
 * **API 통신**: HTTP/REST (Axios for inter-service communication)
 * **패키지 매니저**: Yarn
 * **버전 관리**: Git
-* **개발 환경**: Docker (선택 사항이지만 권장)
-
-## 6. 실행 방법
-
-프로젝트 루트 및 각 서버(`apps/auth-server`, `apps/event-server`, `apps/gateway-server`) 디렉토리에서 다음 명령어를 사용하여 필요한 패키지를 설치합니다.
-
-```bash
-yarn install
-```
-
-각 서버를 실행하려면 해당 서버 디렉토리로 이동하여 다음 명령어를 실행합니다. (환경 변수 설정 필요 - 각 서버의 `.env.example` 참조)
-
-```bash
-# 개발 모드 (변경 사항 감지 및 자동 재시작)
-yarn start:dev
-
-# 운영 모드
-# yarn build
-# yarn start:prod
-```
-
-**환경 변수 설정:**
-
-각 서버 (`apps/auth-server`, `apps/event-server`, `apps/gateway-server`)의 루트 디렉토리에 있는 `.env.example` 파일을 복사하여 `.env.development` (개발용) 또는 `.env.production` (운영용) 파일을 생성하고, 해당 환경에 맞게 값을 수정해야 합니다.
-
-**주요 환경 변수:**
-
-* `PORT`: 각 서버가 실행될 포트 번호
-* `MONGODB_URI`: MongoDB 접속 주소
-* `MONGODB_DB_NAME`: 사용할 데이터베이스 이름
-* `JWT_SECRET`: JWT 서명 및 검증에 사용될 비밀 키 (모든 서버가 동일한 값을 사용해야 함)
-* `JWT_EXPIRES_IN`: JWT 유효 기간 (예: `60m`, `1d`)
-* `AUTH_SERVER_URL` (Gateway Server용): Auth Server의 주소
-* `EVENT_SERVER_URL` (Gateway Server용): Event Server의 주소
+* **개발 환경**: Docker
 
 ## 7. 향후 개선 및 고려 사항
 
-* **Public 경로 명시적 처리**: Gateway의 `@Public()` 데코레이터를 사용하여 로그인, 회원가입 등의 엔드포인트를 명확히 지정. (현재는 `AppController`의 `@All('*')`로 인해 전역 가드가 모든 경로에 적용됨. 특정 경로에 대한 예외 처리가 필요.)
 * **테스트 코드**: 단위 테스트, 통합 테스트, E2E 테스트 코드 작성.
 * **로깅 및 모니터링**: Winston, Sentry 등을 활용한 고급 로깅 및 모니터링 시스템 구축.
 * **메시지 큐 도입**: 서비스 간 비동기 통신이 필요한 경우 Kafka, RabbitMQ 등 도입 고려.
-* **API 문서화**: Swagger (OpenAPI)를 이용한 API 문서 자동 생성.
-* **Docker Compose**: 멀티 컨테이너 애플리케이션 실행 간소화.
 * **CI/CD 파이프라인**: GitHub Actions 등을 이용한 빌드/테스트/배포 자동화.
 * **보안 강화**: Helmet, csurf 등 보안 라이브러리 적용, HTTPS 적용, 정기적인 보안 취약점 점검.
-
-(기존 README.md의 나머지 내용이 있다면 여기에 유지됩니다. 지금은 프로젝트 전체 README.md가 새로 작성되는 것으로 가정하고 진행합니다.)

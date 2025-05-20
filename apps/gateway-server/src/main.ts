@@ -18,7 +18,7 @@ async function bootstrap() {
 
   // Swagger 설정
   const config = new DocumentBuilder()
-    .setTitle('이벤트 플랫폼 API 게이트웨이')
+    .setTitle('게이트웨이 API')
     .setDescription(
       '이벤트 플랫폼 API 게이트웨이입니다. 인증을 처리하고 요청을 다운스트림 서비스로 프록시합니다.',
     )

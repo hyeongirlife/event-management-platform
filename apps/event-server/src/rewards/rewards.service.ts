@@ -3,8 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Connection, Model, Types, ClientSession } from 'mongoose';
 import { CreateRewardDto } from './dto/create-reward.dto';
 import { UpdateRewardDto } from './dto/update-reward.dto';
 import { Reward, RewardDocument, RewardType } from './schemas/reward.schema';
@@ -31,6 +31,7 @@ export class RewardsService {
   constructor(
     @InjectModel(Reward.name) private rewardModel: Model<RewardDocument>,
     private readonly eventsService: EventsService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   async create(
@@ -43,17 +44,19 @@ export class RewardsService {
     try {
       const event = await this.eventsService.findOne(eventId);
       if (!event) {
-        throw new NotFoundException(`Event with ID "${eventId}" not found.`);
+        throw new NotFoundException(
+          `해당 ID의 이벤트를 찾을 수 없습니다: "${eventId}"`,
+        );
       }
       if ([EventStatus.ENDED, EventStatus.CANCELLED].includes(event.status)) {
         throw new BadRequestException(
-          `Cannot add reward to an event that is ${event.status}.`,
+          `종료되었거나 취소된 이벤트에는 보상을 추가할 수 없습니다. (상태: ${event.status})`,
         );
       }
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw new NotFoundException(
-          `Event with ID "${eventId}" not found or has been deleted.`,
+          `해당 ID의 이벤트를 찾을 수 없거나 삭제되었습니다: "${eventId}"`,
         );
       }
       throw error;
@@ -61,17 +64,17 @@ export class RewardsService {
 
     if (type === RewardType.ITEM && !itemCode) {
       throw new BadRequestException(
-        'itemCode is required for ITEM type rewards.',
+        'ITEM 타입 보상에는 itemCode가 필수입니다.',
       );
     }
     if (type === RewardType.COUPON && !couponCode) {
       throw new BadRequestException(
-        'couponCode is required for COUPON type rewards.',
+        'COUPON 타입 보상에는 couponCode가 필수입니다.',
       );
     }
     if (type === RewardType.POINT && (itemCode || couponCode)) {
       throw new BadRequestException(
-        'itemCode/couponCode should not be provided for POINT type rewards.',
+        'POINT 타입 보상에는 itemCode/couponCode를 입력할 수 없습니다.',
       );
     }
 
@@ -138,7 +141,7 @@ export class RewardsService {
 
   async findOne(id: string): Promise<Reward> {
     if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid reward ID format.');
+      throw new BadRequestException('잘못된 보상 ID 형식입니다.');
     }
     const reward = await this.rewardModel
       .findOne({ _id: new Types.ObjectId(id), deletedAt: null })
@@ -147,7 +150,7 @@ export class RewardsService {
 
     if (!reward) {
       throw new NotFoundException(
-        `Reward with ID "${id}" not found or has been deleted.`,
+        `해당 ID의 보상을 찾을 수 없거나 삭제되었습니다: "${id}"`,
       );
     }
     return reward;
@@ -159,7 +162,7 @@ export class RewardsService {
     userId: string,
   ): Promise<Reward> {
     if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid reward ID format.');
+      throw new BadRequestException('잘못된 보상 ID 형식입니다.');
     }
 
     const currentReward = await this.findOne(id);
@@ -174,14 +177,14 @@ export class RewardsService {
         if (!event) throw new NotFoundException();
         if ([EventStatus.ENDED, EventStatus.CANCELLED].includes(event.status)) {
           throw new BadRequestException(
-            `Cannot associate reward with an event that is ${event.status}.`,
+            `종료되었거나 취소된 이벤트에는 보상을 연결할 수 없습니다. (상태: ${event.status})`,
           );
         }
         payload.eventId = new Types.ObjectId(eventId);
       } catch (error) {
         if (error instanceof NotFoundException) {
           throw new NotFoundException(
-            `New Event with ID "${eventId}" not found or has been deleted.`,
+            `새로운 이벤트 ID "${eventId}"를 찾을 수 없거나 삭제되었습니다.`,
           );
         }
         throw error;
@@ -196,17 +199,17 @@ export class RewardsService {
 
     if (newType === RewardType.ITEM && !newItemCode) {
       throw new BadRequestException(
-        'itemCode is required for ITEM type rewards.',
+        'ITEM 타입 보상에는 itemCode가 필수입니다.',
       );
     }
     if (newType === RewardType.COUPON && !newCouponCode) {
       throw new BadRequestException(
-        'couponCode is required for COUPON type rewards.',
+        'COUPON 타입 보상에는 couponCode가 필수입니다.',
       );
     }
     if (newType === RewardType.POINT && (newItemCode || newCouponCode)) {
       throw new BadRequestException(
-        'itemCode/couponCode should not be provided for POINT type rewards.',
+        'POINT 타입 보상에는 itemCode/couponCode를 입력할 수 없습니다.',
       );
     }
     payload.type = newType;
@@ -233,7 +236,7 @@ export class RewardsService {
           updateRewardDto[field] !== currentReward[field]
         ) {
           throw new BadRequestException(
-            `Cannot update reward details for an event that is ${linkedEvent.status}.`,
+            `종료되었거나 취소된 이벤트의 보상 정보는 수정할 수 없습니다. (상태: ${linkedEvent.status})`,
           );
         }
       }
@@ -254,7 +257,7 @@ export class RewardsService {
 
     if (!updatedReward) {
       throw new NotFoundException(
-        `Reward with ID "${id}" not found, has been deleted, or an issue occurred during update.`,
+        `해당 ID의 보상을 찾을 수 없거나 삭제되었거나, 업데이트 중 문제가 발생했습니다: "${id}"`,
       );
     }
     return updatedReward;
@@ -262,7 +265,7 @@ export class RewardsService {
 
   async remove(id: string, userId: string): Promise<Reward> {
     if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid reward ID format.');
+      throw new BadRequestException('잘못된 보상 ID 형식입니다.');
     }
 
     const currentReward = await this.rewardModel.findOne({
@@ -272,7 +275,7 @@ export class RewardsService {
 
     if (!currentReward) {
       throw new NotFoundException(
-        `Reward with ID "${id}" not found or already deleted.`,
+        `해당 ID의 보상을 찾을 수 없거나 이미 삭제되었습니다: "${id}"`,
       );
     }
 
@@ -292,10 +295,31 @@ export class RewardsService {
 
     if (!softDeletedReward) {
       throw new NotFoundException(
-        `Reward with ID "${id}" could not be deleted. It might have been deleted by another process.`,
+        `해당 ID의 보상을 삭제할 수 없습니다. 다른 프로세스에 의해 이미 삭제되었을 수 있습니다: "${id}"`,
       );
     }
 
     return softDeletedReward;
+  }
+
+  async findByEventId(eventId: string): Promise<Reward[]> {
+    return this.rewardModel.find({ eventId, deletedAt: null }).exec();
+  }
+
+  async softDeleteByEventId(
+    eventId: string,
+    userId: string,
+    session?: ClientSession,
+  ): Promise<void> {
+    await this.rewardModel.updateMany(
+      { eventId: new Types.ObjectId(eventId), deletedAt: null },
+      {
+        $set: {
+          deletedAt: new Date(),
+          deletedBy: userId,
+        },
+      },
+      { session },
+    );
   }
 }

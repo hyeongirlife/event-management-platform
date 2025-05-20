@@ -25,6 +25,8 @@ import { Roles } from './decorators/roles.decorator';
 import { RolesGuard } from './guards/roles.guard';
 import { LoginDto } from './dto/login.dto';
 import { ApiProperty } from '@nestjs/swagger';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
 
 interface UserFromLocalStrategy {
   _id: string;
@@ -68,7 +70,10 @@ class AdminTestResponse {
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    @InjectConnection() private readonly connection: Connection,
+  ) {}
 
   @Public()
   @Post('register')
@@ -87,7 +92,16 @@ export class AuthController {
     description: '사용자 이름 또는 이메일 중복',
   })
   async register(@Body() createUserDto: CreateUserDto) {
-    return this.authService.register(createUserDto);
+    const session = await this.connection.startSession();
+    try {
+      let result;
+      await session.withTransaction(async () => {
+        result = await this.authService.register(createUserDto, session);
+      });
+      return result;
+    } finally {
+      session.endSession();
+    }
   }
 
   @Public()

@@ -197,3 +197,36 @@ sequenceDiagram
 *   **교훈**: 마이크로서비스 간 통신 문제 발생 시, 각 서비스의 환경 변수 설정, 네트워크 경로, 그리고 각 서비스 내부의 로그를 면밀히 확인해야 함. 한쪽 서비스의 타임아웃은 다른 쪽 서비스의 예기치 않은 에러(예: "request aborted")를 유발할 수 있으므로 연관 관계를 파악하는 것이 중요.
 
 ---
+
+# Gateway Server - 실무 트러블슈팅 & 경험 정리
+
+## 1. JWT 인증/인가와 req.user
+- Gateway에서 JwtAuthGuard, JwtStrategy를 통해 JWT 인증을 수행하고, req.user에 사용자 정보를 할당해야 RolesGuard 등에서 정상적으로 인가가 동작함.
+- JwtStrategy의 validate()에서 반드시 userId, username, roles를 반환해야 req.user가 생성됨.
+- req.user가 undefined인 경우, 인증 미들웨어가 누락되었거나, JWT가 잘못된 경우임을 빠르게 진단.
+
+## 2. 프록시 구조와 내부 서비스 연동
+- Gateway에서 인증/인가 후 event-server, auth-server 등으로 프록시할 때 Authorization 헤더를 그대로 전달해야 내부 서비스에서도 JWT 인증이 가능함.
+- 내부 서비스도 반드시 JWT 인증을 별도로 수행해야 보안이 유지됨(MSA 실무 표준).
+
+## 3. DTO/ValidationPipe
+- DTO에 class-validator 데코레이터가 없으면 ValidationPipe에서 property should not exist 에러가 발생함.
+- Swagger 문서화와 DTO 검증을 동시에 만족시키기 위해 @ApiProperty, @IsString 등 데코레이터를 병행 사용.
+
+## 4. req.user와 x-user-id의 차이
+- 실무에서는 인증/인가/데이터 접근 제어는 반드시 req.user 기반으로 처리해야 하며, x-user-id 등 커스텀 헤더는 내부 시스템 간 부가 정보로만 활용.
+- Gateway에서 인증 후 내부 서비스로 프록시할 때 x-user-id, x-user-roles 등 헤더를 추가할 수 있으나, 보안상 신뢰하지 않음.
+
+## 5. Guard/Role 인가
+- RolesGuard에서 req.user.roles와 @Roles() 데코레이터의 값을 비교하여 인가를 수행.
+- JwtAuthGuard가 먼저 실행되어 req.user가 반드시 할당되어야 함.
+- 실무적으로는 APP_GUARD로 전역 등록하여 모든 API에 일관성 있게 적용.
+
+## 6. 실무적 방어코드/에러 처리
+- req.user가 undefined일 때 401 Unauthorized를 반환하도록 방어코드 작성.
+- 프록시 서비스에서 req가 undefined일 때 명확한 에러 메시지로 빠르게 원인 진단.
+
+## 7. MSA 구조의 인증/인가 실무 패턴
+- Gateway, event-server, auth-server 등 모든 서비스가 독립적으로 JWT 인증/인가를 수행해야 보안과 확장성이 보장됨.
+- Gateway에서 인증을 했더라도, 내부 서비스는 Authorization 헤더를 받아서 다시 인증.
+

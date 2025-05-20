@@ -20,28 +20,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const handler = context.getHandler();
     const controller = context.getClass();
 
-    const handlerMeta = this.reflector.get(IS_PUBLIC_KEY, handler);
-    const classMeta = this.reflector.get(IS_PUBLIC_KEY, controller);
-    this.logger.debug(
-      `[JwtAuthGuard] Handler metadata for IS_PUBLIC_KEY: ${handlerMeta}`,
-    );
-    this.logger.debug(
-      `[JwtAuthGuard] Class metadata for IS_PUBLIC_KEY: ${classMeta}`,
-    );
-
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       handler,
       controller,
     ]);
 
     const request = context.switchToHttp().getRequest();
-    this.logger.debug(
-      `[JwtAuthGuard] Path: ${request.url}, Method: ${request.method}`,
-    );
-    this.logger.debug(
-      `[JwtAuthGuard] Controller: ${context.getClass().name}, Handler: ${context.getHandler().name}`,
-    );
-    this.logger.debug(`[JwtAuthGuard] isPublic flag evaluated to: ${isPublic}`);
 
     if (isPublic) {
       this.logger.log(

@@ -9,6 +9,7 @@ import {
   Query,
   Req,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 
 import { RewardsService } from './rewards.service';
@@ -23,14 +24,19 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { UserRole } from 'src/common/enums/user-role.enum';
+import { RolesGuard } from 'src/common/guards';
 
-@ApiTags('보상 API')
-@ApiBearerAuth('accessToken')
+@ApiTags('보상')
+@ApiBearerAuth('JWT-auth')
 @Controller('rewards')
 export class RewardsController {
   constructor(private readonly rewardsService: RewardsService) {}
 
   @Post()
+  @Roles(UserRole.OPERATOR, UserRole.ADMIN)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: '새 보상 생성 (운영자/관리자)',
     description: '특정 이벤트에 연결되는 새로운 보상을 시스템에 등록합니다.',
@@ -41,7 +47,7 @@ export class RewardsController {
   @ApiResponse({ status: 403, description: '권한 없음' })
   @ApiResponse({ status: 404, description: '연결하려는 이벤트를 찾을 수 없음' })
   create(@Body() createRewardDto: CreateRewardDto, @Req() req: any) {
-    const userId = req.headers['x-user-id'];
+    const userId = req.user?.userId;
     if (!userId) {
       throw new UnauthorizedException('사용자 ID가 필요합니다.');
     }
@@ -49,6 +55,8 @@ export class RewardsController {
   }
 
   @Get()
+  @Roles(UserRole.AUDITOR, UserRole.OPERATOR, UserRole.ADMIN)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: '모든 보상 조회 (페이지네이션, 필터링, 정렬 지원)',
     description:
@@ -63,6 +71,8 @@ export class RewardsController {
   }
 
   @Get(':id')
+  @Roles(UserRole.AUDITOR, UserRole.OPERATOR, UserRole.ADMIN)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: '특정 보상 상세 조회',
     description: 'ID를 사용하여 특정 보상의 상세 정보를 조회합니다.',
@@ -79,6 +89,8 @@ export class RewardsController {
   }
 
   @Patch(':id')
+  @Roles(UserRole.OPERATOR, UserRole.ADMIN)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: '특정 보상 수정 (운영자/관리자)',
     description: 'ID를 사용하여 특정 보상을 수정합니다.',
@@ -97,7 +109,7 @@ export class RewardsController {
     @Body() updateRewardDto: UpdateRewardDto,
     @Req() req: any,
   ) {
-    const userId = req.headers['x-user-id'];
+    const userId = req.user?.userId;
     if (!userId) {
       throw new UnauthorizedException('사용자 ID가 필요합니다.');
     }
@@ -105,6 +117,8 @@ export class RewardsController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.OPERATOR, UserRole.ADMIN)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: '특정 보상 삭제 (운영자/관리자)',
     description: 'ID를 사용하여 특정 보상을 논리적으로 삭제합니다.',
@@ -115,10 +129,25 @@ export class RewardsController {
   @ApiResponse({ status: 403, description: '권한 없음' })
   @ApiResponse({ status: 404, description: '보상을 찾을 수 없음' })
   remove(@Param('id') id: string, @Req() req: any) {
-    const userId = req.headers['x-user-id'];
+    const userId = req.user?.userId;
     if (!userId) {
       throw new UnauthorizedException('사용자 ID가 필요합니다.');
     }
     return this.rewardsService.remove(id, userId);
+  }
+
+  @Get('by-event/:eventId')
+  @ApiOperation({
+    summary: '이벤트별 보상 목록 조회',
+    description: '특정 이벤트에 연결된 모든 보상 목록을 조회합니다.',
+  })
+  @ApiParam({
+    name: 'eventId',
+    description: '이벤트 ID (MongoDB ObjectId)',
+    type: String,
+  })
+  @ApiResponse({ status: 200, description: '이벤트별 보상 목록 조회 성공' })
+  findByEventId(@Param('eventId', new ParseObjectIdPipe()) eventId: string) {
+    return this.rewardsService.findByEventId(eventId);
   }
 }
