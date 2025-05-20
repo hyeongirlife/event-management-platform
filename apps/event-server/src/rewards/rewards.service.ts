@@ -2,9 +2,11 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  forwardRef,
+  Inject,
 } from '@nestjs/common';
-import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Connection, Model, Types, ClientSession } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types, ClientSession } from 'mongoose';
 import { CreateRewardDto } from './dto/create-reward.dto';
 import { UpdateRewardDto } from './dto/update-reward.dto';
 import { Reward, RewardDocument, RewardType } from './schemas/reward.schema';
@@ -30,8 +32,8 @@ export interface PaginatedRewardsResponse {
 export class RewardsService {
   constructor(
     @InjectModel(Reward.name) private rewardModel: Model<RewardDocument>,
+    @Inject(forwardRef(() => EventsService))
     private readonly eventsService: EventsService,
-    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   async create(

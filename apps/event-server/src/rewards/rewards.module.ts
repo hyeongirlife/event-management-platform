@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { RewardsService } from './rewards.service';
 import { RewardsController } from './rewards.controller';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -8,7 +8,7 @@ import { EventsModule } from '../events/events.module';
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Reward.name, schema: RewardSchema }]),
-    EventsModule,
+    forwardRef(() => EventsModule),
   ],
   controllers: [RewardsController],
   providers: [RewardsService],

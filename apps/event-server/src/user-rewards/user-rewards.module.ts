@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UserRewardsController } from './user-rewards.controller';
 import { UserRewardsService } from './user-rewards.service';
@@ -17,7 +17,7 @@ import { Reward, RewardSchema } from '../rewards/schemas/reward.schema';
       { name: Event.name, schema: EventSchema },
       { name: Reward.name, schema: RewardSchema },
     ]),
-    EventsModule,
+    forwardRef(() => EventsModule),
   ],
   controllers: [UserRewardsController],
   providers: [UserRewardsService],

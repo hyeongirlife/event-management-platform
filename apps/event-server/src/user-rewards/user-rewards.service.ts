@@ -4,6 +4,8 @@ import {
   ConflictException,
   InternalServerErrorException,
   Logger,
+  forwardRef,
+  Inject,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Connection, Model, Types, ClientSession } from 'mongoose';
@@ -27,6 +29,7 @@ export class UserRewardsService {
     private userRewardEntryModel: Model<UserRewardEntry>,
     @InjectModel(Event.name) private eventModel: Model<Event>,
     @InjectModel(Reward.name) private rewardModel: Model<Reward>,
+    @Inject(forwardRef(() => EventsService))
     private readonly eventsService: EventsService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
