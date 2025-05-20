@@ -256,31 +256,8 @@ Event Server 실행에 필요한 주요 환경 변수는 다음과 같습니다.
 *   `EVENT_MONGODB_DB_NAME`: 사용할 MongoDB 데이터베이스 이름
 *   `JWT_SECRET`: JWT 검증을 위한 비밀 키 (Gateway Server, Auth Server와 동일해야 함)
 
-## 6. 설정 및 실행 방법 (기본)
 
-1.  **의존성 설치:**
-    ```bash
-    # 프로젝트 루트에서 전체 의존성 설치 (최초 1회 또는 필요시)
-    # yarn install
-
-    # Event Server 개별 의존성 설치 (필요시)
-    cd apps/event-server
-    yarn install
-    ```
-2.  **환경 변수 설정:**
-    *   `apps/event-server` 디렉토리에 `.env.development` (또는 해당 환경의 `.env` 파일)을 생성하고 위 "5. 환경 변수" 섹션을 참고하여 값을 설정합니다. (MongoDB URI, DB 이름, JWT 시크릿 등)
-3.  **개발 모드 실행:**
-    ```bash
-    # apps/event-server 디렉토리에서 실행
-    yarn start:dev event-server
-    ```
-    또는 프로젝트 루트에서:
-    ```bash
-    yarn start:dev event-server
-    ```
-    서버가 정상적으로 실행되면 설정된 포트(기본 3002)로 API 요청을 받을 수 있습니다. Swagger UI는 `/api/v1/api-docs` 경로에서 접근 가능합니다.
-
-## 7. 향후 개선 및 고려 사항
+## 6. 향후 개선 및 고려 사항
 
 *   **`UserRewardsModule` 추가 기능**:
     *   `validateEventCondition` 메소드의 실제 조건 검증 로직 구체화 (사용자 데이터 연동 등).
@@ -292,34 +269,59 @@ Event Server 실행에 필요한 주요 환경 변수는 다음과 같습니다.
 *   **보안 강화**: 입력값 검증 강화, 인가 로직 세분화, 주요 작업에 대한 감사 로그 기록.
 *   **성능 최적화**: DB 쿼리 최적화, 필요한 곳에 캐싱 전략 도입.
 
-## 8. 트러블슈팅
 
-# Event Server - 실무 트러블슈팅 & 경험 정리
+## 8. 실무 트러블슈팅 & 경험 정리
 
-## 1. JWT 인증/인가와 req.user
-- event-server도 Gateway와 별도로 JwtAuthGuard, JwtStrategy를 적용하여 JWT 인증을 독립적으로 수행해야 함(MSA 실무 표준).
-- req.user가 undefined인 경우, JwtAuthGuard가 누락되었거나, 인증 미들웨어가 정상 동작하지 않는 상황임을 빠르게 진단.
+### 1. JWT 인증/인가와 req.user
+- **문제/이슈:** event-server도 Gateway와 별도로 JwtAuthGuard, JwtStrategy를 적용하여 JWT 인증을 독립적으로 수행해야 함(MSA 실무 표준). req.user가 undefined인 경우, 인증 미들웨어가 정상 동작하지 않는 상황임을 빠르게 진단해야 함.
+- **원인:** Gateway에서 인증을 했더라도, event-server가 Authorization 헤더를 받아서 다시 JWT 인증을 수행하지 않으면 req.user가 undefined가 됨.
+- **해결 방법:** event-server에 JwtAuthGuard, JwtStrategy를 별도로 적용하고, APP_GUARD로 전역 등록. 모든 API에서 req.user가 항상 할당되도록 보장.
+- **실무적 교훈:** MSA 환경에서는 각 서비스가 독립적으로 인증/인가를 수행해야 보안과 확장성이 보장됨. 프록시 구조라도 각 서비스의 인증 미들웨어는 필수.
 
-## 2. Guard/Role 인가
-- RolesGuard에서 req.user.roles와 @Roles() 데코레이터의 값을 비교하여 인가를 수행.
-- JwtAuthGuard가 반드시 먼저 실행되어야 req.user가 할당됨.
-- APP_GUARD로 전역 등록하여 모든 API에 일관성 있게 적용.
+### 2. Guard/Role 인가
+- **문제/이슈:** RolesGuard에서 req.user.roles와 @Roles() 데코레이터의 값을 비교하여 인가를 수행. JwtAuthGuard가 반드시 먼저 실행되어야 req.user가 할당됨.
+- **원인:** APP_GUARD 등록 순서가 잘못되면 req.user가 undefined가 되어 인가 로직이 동작하지 않음.
+- **해결 방법:** JwtAuthGuard → RolesGuard 순서로 APP_GUARD 전역 등록. @Public() 데코레이터가 붙은 엔드포인트는 인증/인가를 건너뛰도록 구현.
+- **실무적 교훈:** 인증/인가 체인은 순서와 예외처리(@Public)까지 꼼꼼히 설계해야 한다.
 
-## 3. 프록시 구조와 내부 서비스 연동
-- Gateway에서 Authorization 헤더를 그대로 전달받아 event-server에서 다시 JWT 인증을 수행해야 보안이 유지됨.
-- Gateway에서 인증을 했더라도, event-server가 Authorization 헤더를 받아서 다시 인증하지 않으면 req.user가 undefined가 됨.
+### 3. 프록시 구조와 내부 서비스 연동
+- **문제/이슈:** Gateway에서 Authorization 헤더를 그대로 전달받아 event-server에서 다시 JWT 인증을 수행해야 보안이 유지됨.
+- **원인:** Gateway에서 인증을 했더라도, event-server가 Authorization 헤더를 받아서 다시 인증하지 않으면 req.user가 undefined가 됨.
+- **해결 방법:** Gateway에서 X-User-* 헤더와 Authorization 헤더를 모두 event-server로 전달. event-server는 Authorization 헤더로 JWT 인증을 독립적으로 수행.
+- **실무적 교훈:** MSA에서 프록시 구조를 쓸 때, 인증/인가 책임 분리가 명확해야 하며, 각 서비스가 독립적으로 보안 경계를 유지해야 한다.
 
-## 4. DTO/ValidationPipe
-- DTO에 class-validator 데코레이터가 없으면 ValidationPipe에서 property should not exist 에러가 발생함.
-- Swagger 문서화와 DTO 검증을 동시에 만족시키기 위해 @ApiProperty, @IsString 등 데코레이터를 병행 사용.
+### 4. DTO/ValidationPipe
+- **문제/이슈:** DTO에 class-validator 데코레이터가 없으면 ValidationPipe에서 property should not exist 에러가 발생함.
+- **원인:** Swagger 문서화와 DTO 검증을 동시에 만족시키기 위해 @ApiProperty, @IsString 등 데코레이터를 병행 사용해야 함.
+- **해결 방법:** 모든 DTO에 class-validator와 Swagger 데코레이터를 병행 적용. ValidationPipe를 글로벌로 적용하여 모든 입력값을 검증.
+- **실무적 교훈:** DTO 유효성 검증과 문서화는 실무에서 반드시 병행해야 하며, 이를 통해 API 신뢰성과 보안성을 높일 수 있다.
 
-## 5. 실무적 방어코드/에러 처리
-- req.user가 undefined일 때 401 Unauthorized를 반환하도록 방어코드 작성.
-- 프록시 서비스에서 req가 undefined일 때 명확한 에러 메시지로 빠르게 원인 진단.
+### 5. 방어코드/에러 처리
+- **문제/이슈:** req.user가 undefined일 때 401 Unauthorized를 반환하도록 방어코드 작성 필요. 프록시 서비스에서 req가 undefined일 때 명확한 에러 메시지로 빠르게 원인 진단.
+- **원인:** 인증 미들웨어 누락, 잘못된 헤더 전달 등으로 인한 예외 상황.
+- **해결 방법:** 컨트롤러/서비스에서 req.user 체크 및 명확한 예외 처리. 에러 메시지에 원인/상황을 명확히 기록.
+- **실무적 교훈:** 예상치 못한 상황에 대한 방어코드는 실무에서 필수. 에러 메시지는 원인 진단에 도움이 되도록 구체적으로 작성.
 
-## 6. 실무적 MSA 구조
-- Gateway, event-server, auth-server 등 모든 서비스가 독립적으로 JWT 인증/인가를 수행해야 보안과 확장성이 보장됨.
-- 인증/인가 로직, DTO, 에러 처리 등 모든 레이어에서 일관성 있게 실무 패턴 적용.
+### 6. 트랜잭션/참조 무결성
+- **문제/이슈:** 이벤트 삭제 시, 연결된 보상/유저보상 엔트리까지 무결성 있게 처리해야 함. 고아 데이터, 잘못된 참조, 데이터 불일치 문제 발생 가능.
+- **원인:** 단일 문서만 soft delete하면, 참조된 보상/유저보상 엔트리가 남아 데이터 일관성이 깨짐.
+- **해결 방법:** 이벤트 삭제 시 RewardsService, UserRewardsService의 softDeleteByEventId를 트랜잭션 내에서 호출하여, 이벤트-보상-유저보상까지 원자적으로 soft delete 처리.
+- **실무적 교훈:** MSA 환경에서도 데이터 무결성(특히 참조 관계)은 트랜잭션/일괄 처리로 보장해야 하며, 이를 통해 운영 중 장애/감사 이슈를 예방할 수 있다.
 
----
-면접에서 위 이슈와 해결 경험, 실무적 패턴을 명확히 설명할 수 있도록 준비!
+### 7. 데이터 일관성/중복 방지
+- **문제/이슈:** 동일 사용자가 동일 이벤트에 중복 보상 요청을 할 수 있음.
+- **원인:** (userId, eventId) 조합에 대한 unique 인덱스 미설정 또는 로직 미구현.
+- **해결 방법:** user_reward_entries 컬렉션에 (userId, eventId) unique 인덱스 적용. 서비스 레벨에서도 중복 요청 방지 로직 구현.
+- **실무적 교훈:** DB 인덱스와 서비스 로직의 이중 방어로 데이터 중복/불일치 문제를 원천 차단해야 한다.
+
+### 8. 감사/보안/운영자 로그
+- **문제/이슈:** 보상 지급, 이벤트/보상 생성/수정/삭제 등 주요 활동에 대한 감사/운영자 로그가 필요함.
+- **원인:** 실무에서는 보안/감사 요구사항이 높고, 문제 발생 시 원인 추적이 필수.
+- **해결 방법:** createdBy, updatedBy, deletedBy 필드를 모든 주요 컬렉션에 기록. 지급/상태/실패 사유 등 상세 기록. (추가적으로 별도 감사 로그 컬렉션/시스템 도입 고려)
+- **실무적 교훈:** 모든 주요 활동에 대한 감사/운영자 로그는 실무에서 필수. 추후 보안/감사 요구사항 대응이 용이해진다.
+
+### 9. 실무적 MSA 구조/확장성
+- **문제/이슈:** Gateway, event-server, auth-server 등 모든 서비스가 독립적으로 JWT 인증/인가를 수행해야 보안과 확장성이 보장됨.
+- **원인:** 인증/인가 로직, DTO, 에러 처리 등 모든 레이어에서 일관성 있게 실무 패턴 적용 필요.
+- **해결 방법:** 각 서비스별로 인증/인가/에러 처리/로깅/테스트 등 실무 패턴을 일관성 있게 적용. 공통 모듈/유틸리티화도 고려.
+- **실무적 교훈:** 실무적 MSA 구조는 각 서비스의 독립성과 일관성, 확장성을 모두 고려해야 하며, 이를 통해 유지보수성과 장애 대응력을 높일 수 있다.
