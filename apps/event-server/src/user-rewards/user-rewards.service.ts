@@ -5,8 +5,8 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Connection, Model, Types, ClientSession } from 'mongoose';
 import {
   UserRewardEntry,
   UserRewardEntryStatus,
@@ -28,6 +28,7 @@ export class UserRewardsService {
     @InjectModel(Event.name) private eventModel: Model<Event>,
     @InjectModel(Reward.name) private rewardModel: Model<Reward>,
     private readonly eventsService: EventsService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   async findUserRewards(

@@ -3,8 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Connection, Model, Types, ClientSession } from 'mongoose';
 import { CreateRewardDto } from './dto/create-reward.dto';
 import { UpdateRewardDto } from './dto/update-reward.dto';
 import { Reward, RewardDocument, RewardType } from './schemas/reward.schema';
@@ -31,6 +31,7 @@ export class RewardsService {
   constructor(
     @InjectModel(Reward.name) private rewardModel: Model<RewardDocument>,
     private readonly eventsService: EventsService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   async create(

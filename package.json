@@ -50,7 +50,7 @@
     "test:e2e:gateway": "cd apps/gateway-server && yarn test:e2e",
 
     "docker:build": "docker-compose build --no-cache",
-    "docker:up": "docker-compose up -d",
+    "docker:up": "docker-compose up -d --build && bash ./init-mongo-replica.sh",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f --tail=100",
 

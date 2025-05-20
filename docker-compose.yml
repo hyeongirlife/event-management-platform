@@ -9,6 +9,7 @@ services:
       - "27019:27017"
     environment:
       MONGO_INITDB_DATABASE: auth
+    command: ["--replSet", "rs0"]
     volumes:
       - auth-db-data:/data/db
     networks:
@@ -22,6 +23,7 @@ services:
       - "27018:27017"
     environment:
       MONGO_INITDB_DATABASE: event
+    command: ["--replSet", "rs0"]
     volumes:
       - event-db-data:/data/db
     networks:

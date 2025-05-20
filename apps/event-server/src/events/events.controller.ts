@@ -25,12 +25,17 @@ import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from 'src/common/enums/user-role.enum';
 import { RolesGuard } from 'src/common/guards';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
 
 @ApiTags('이벤트')
 @ApiBearerAuth('accessToken')
 @Controller('events')
 export class EventsController {
-  constructor(private readonly eventsService: EventsService) {}
+  constructor(
+    private readonly eventsService: EventsService,
+    @InjectConnection() private readonly connection: Connection,
+  ) {}
 
   @Post()
   @Roles(UserRole.OPERATOR, UserRole.ADMIN)
@@ -48,7 +53,9 @@ export class EventsController {
     if (!userId) {
       throw new UnauthorizedException('사용자 ID가 필요합니다.');
     }
-    return this.eventsService.create(createEventDto, userId);
+    return this.withTransaction(async (session) => {
+      return this.eventsService.create(createEventDto, userId, session);
+    });
   }
 
   @Get()
@@ -101,7 +108,9 @@ export class EventsController {
     if (!userId) {
       throw new UnauthorizedException('사용자 ID가 필요합니다.');
     }
-    return this.eventsService.update(id, updateEventDto, userId);
+    return this.withTransaction(async (session) => {
+      return this.eventsService.update(id, updateEventDto, userId, session);
+    });
   }
 
   @Delete(':id')
@@ -120,6 +129,21 @@ export class EventsController {
     if (!userId) {
       throw new UnauthorizedException('사용자 ID가 필요합니다.');
     }
-    return this.eventsService.remove(id, userId);
+    return this.withTransaction(async (session) => {
+      return this.eventsService.remove(id, userId, session);
+    });
+  }
+
+  private async withTransaction<T>(fn: (session) => Promise<T>): Promise<T> {
+    const session = await this.connection.startSession();
+    try {
+      let result;
+      await session.withTransaction(async () => {
+        result = await fn(session);
+      });
+      return result;
+    } finally {
+      session.endSession();
+    }
   }
 }

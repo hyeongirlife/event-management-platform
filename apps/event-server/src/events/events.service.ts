@@ -4,8 +4,8 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { FilterQuery, Model, Connection, ClientSession } from 'mongoose';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { Event, EventDocument, EventStatus } from './schemas/event.schema';
@@ -29,11 +29,13 @@ export interface PaginatedEventsResponse {
 export class EventsService {
   constructor(
     @InjectModel(Event.name) private eventModel: Model<EventDocument>,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   async create(
     createEventDto: CreateEventDto,
     userId?: string,
+    session?: ClientSession,
   ): Promise<Event> {
     const eventToCreate = {
       ...createEventDto,
@@ -42,7 +44,7 @@ export class EventsService {
       ...(userId && { createdBy: userId }), // userId가 제공되면 createdBy 설정
     };
     const createdEvent = new this.eventModel(eventToCreate);
-    return createdEvent.save();
+    return createdEvent.save({ session });
   }
 
   async findAll(
@@ -134,6 +136,7 @@ export class EventsService {
     id: string,
     updateEventDto: UpdateEventDto,
     userId?: string,
+    session?: ClientSession,
   ): Promise<Event> {
     // 1. 현재 이벤트 정보 조회 (deletedAt: null 조건 포함)
     const currentEvent = await this.findOne(id);
@@ -201,7 +204,10 @@ export class EventsService {
     }
 
     const updatedEvent = await this.eventModel
-      .findOneAndUpdate({ _id: id, deletedAt: null }, payload, { new: true })
+      .findOneAndUpdate({ _id: id, deletedAt: null }, payload, {
+        new: true,
+        session,
+      })
       .exec();
 
     if (!updatedEvent) {
@@ -212,7 +218,11 @@ export class EventsService {
     return updatedEvent;
   }
 
-  async remove(id: string, userId?: string): Promise<Event> {
+  async remove(
+    id: string,
+    userId?: string,
+    session?: ClientSession,
+  ): Promise<Event> {
     const updatePayload: { deletedAt: Date; deletedBy?: string } = {
       deletedAt: new Date(),
     };
@@ -221,7 +231,7 @@ export class EventsService {
     }
 
     const softDeletedEvent = await this.eventModel
-      .findByIdAndUpdate(id, { $set: updatePayload }, { new: true })
+      .findByIdAndUpdate(id, { $set: updatePayload }, { new: true, session })
       .exec();
 
     if (!softDeletedEvent) {

@@ -105,8 +105,7 @@ export class UserRewardsController {
   @UseGuards(RolesGuard)
   @ApiOperation({
     summary: '사용자 이벤트 보상 요청',
-    description:
-      '특정 이벤트에 대해 사용자가 보상을 요청합니다. 요청 헤더에 X-User-ID가 포함되어야 합니다.',
+    description: '특정 이벤트에 대해 사용자가 보상을 요청합니다.',
   })
   @ApiResponse({
     status: 201,
@@ -114,7 +113,7 @@ export class UserRewardsController {
     type: '#/components/schemas/UserRewardEntryResponseDto',
   })
   @ApiResponse({ status: 400, description: '잘못된 요청 (예: eventId 누락)' })
-  @ApiResponse({ status: 401, description: '인증 실패 (X-User-ID 누락)' })
+  @ApiResponse({ status: 401, description: '인증 실패 req.user가 없음' })
   @ApiResponse({ status: 404, description: '이벤트를 찾을 수 없음' })
   @ApiResponse({
     status: 409,

@@ -3,8 +3,8 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Connection, Model, ClientSession } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto'; // DTO (나중에 생성 필요)
 // import { UpdateUserDto } from './dto/update-user.dto'; // DTO (나중에 생성 필요)
@@ -13,22 +13,26 @@ import { CreateUserDto } from './dto/create-user.dto'; // DTO (나중에 생성 
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   /**
    * 새로운 사용자를 생성합니다.
    * username 또는 email이 이미 존재하면 ConflictException을 발생시킵니다.
    * @param createUserDto 사용자 생성 DTO
+   * @param session 몽고DB 세션
    * @returns 생성된 사용자 객체 (비밀번호 제외)
    */
   async createUser(
     createUserDto: CreateUserDto,
+    session?: ClientSession,
   ): Promise<Omit<User, 'password'>> {
     const { username, email } = createUserDto;
 
     // username 또는 email 중복 확인
     const existingUser = await this.userModel
       .findOne({ $or: [{ username }, { email }] })
+      .session(session || null)
       .exec();
     if (existingUser) {
       if (existingUser.username === username) {
@@ -41,7 +45,7 @@ export class UsersService {
 
     const newUser = new this.userModel(createUserDto);
     // save() 메서드 내에서 pre-save hook이 실행되어 비밀번호가 해싱됨
-    const savedUser = await newUser.save();
+    const savedUser = await newUser.save({ session });
 
     // mongoose 문서를 일반 객체로 변환하고 password 필드를 수동으로 한 번 더 확실히 제거
     // UserSchema의 toJSON transform이 호출되지만, 명시적으로 타입을 맞추기 위함
